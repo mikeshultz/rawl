@@ -1,5 +1,6 @@
 import logging
 import random
+from enum import IntEnum
 from abc import ABC
 from psycopg2 import sql
 from psycopg2.pool import ThreadedConnectionPool
@@ -15,12 +16,24 @@ class RawlException(Exception): pass
 
 
 class RawlConnection(object):
-    """ Connection handling for rawl """
+    """ 
+    Connection handling for rawl 
+
+    Usage
+    -----
+    with RawlConnection("postgresql://user:pass@server/db") as connection:
+        cursor = connection.cursor()
+        cursor.execute("SELECT * from my_table;")
+        results = cursor.fetchall()
+    """
 
     def __init__(self, dsn_string):
 
         log.debug("Connection init")
 
+        cursor = connection.cursor()
+        cursor.execute("SELECT * from my_table;")
+        results = cursor.fetchall()
         self.dsn = dsn_string
         self.pool = ThreadedConnectionPool(1, 25, self.dsn)
 
@@ -33,7 +46,7 @@ class RawlConnection(object):
 
             self.conn = self.pool.getconn()
             self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
-            return self.conn 
+            return self.conn
 
         except Exception:
             log.exception("Connection failure")
@@ -81,15 +94,31 @@ class RawlBase(ABC):
         self._process_columns(columns)
 
     def _process_columns(self, columns):
+        """ 
+        Handle provided columns and if necessary, convert columns to a list for 
+        internal strage.
+
+        :columns: A sequence of columns for the table. Can be list, comma
+            -delimited string, or IntEnum.
+        """
         if type(columns) == list:
             self.columns = columns
         elif type(columns) == str:
             self.columns = [c.strip() for c in columns.split()]
+        elif type(columns) == IntEnum:
+            self.columns = [str(c) for c in columns]
         else:
             raise RawlException("Unknown format for columns")
 
     def _assemble_select(self, sql_str, columns, *args, **kwargs):
-        """ For mat a select statement with specific columns """
+        """ 
+        Format a select statement with specific columns 
+
+        :sql_str:   An SQL string template
+        :columns:   The columns to be selected and put into {0}
+        :*args:     Arguments to use as query parameters.
+        :returns:   Psycopg2 compiled query
+        """
         
         query_string = sql.SQL(sql_str).format(
             sql.SQL(', ').join([sql.Identifier(x) for x in columns]),
@@ -99,7 +128,13 @@ class RawlBase(ABC):
         return query_string
 
     def _assemble_simple(self, sql_str, *args, **kwargs):
-        """ Format the provided SQL """
+        """ 
+        Format a select statement with specific columns 
+
+        :sql_str:   An SQL string template
+        :*args:     Arguments to use as query parameters.
+        :returns:   Psycopg2 compiled query
+        """
         
         query_string = sql.SQL(sql_str).format(
             *[sql.Literal(a) for a in args]
@@ -108,11 +143,13 @@ class RawlBase(ABC):
         return query_string
 
     def _execute(self, query, commit=False):
-        """ Execute a query with provided parameters 
+        """ 
+        Execute a query with provided parameters 
 
-            Parameters
-            query - SQL string with parameter placeholders
-            commit - If True, the query will commit
+        Parameters
+        :query:     SQL string with parameter placeholders
+        :commit:    If True, the query will commit
+        :returns:   List of rows
         """
 
         result = []
@@ -136,7 +173,14 @@ class RawlBase(ABC):
         return result
 
     def query(self, sql_string, *args, **kwargs):
-        """ Execute a query """
+        """ 
+        Execute a DML query 
+
+        :sql_string:    An SQL string template
+        :*args:         Arguments to be passed for query parameters.
+        :commit:        Whether or not to commit the transaction after the query
+        :returns:       Psycopg2 result
+        """
         commit=None
         if kwargs.get('commit') is not None:
             commit = kwargs.pop('commit')
@@ -144,14 +188,31 @@ class RawlBase(ABC):
         return self._execute(query, commit=commit)
 
     def select(self, sql_string, columns, *args, **kwargs):
-        """ Execute a select """
+        """ 
+        Execute a SELECT statement 
+
+        :sql_string:    An SQL string template
+        :columns:       A list of columns to be returned by the query
+        :*args:         Arguments to be passed for query parameters.
+        :returns:       Psycopg2 result
+        """
         query = self._assemble_select(sql_string, columns, *args, *kwargs)
         return self._execute(query)
 
-    def get(self, id):
-        """ Retreive a single record """
+    def get(self, pk):
+        """ 
+        Retreive a single record from the table.  Should be implemented but not
+        required.
+
+        :pk:            The primary key ID for the record
+        :returns:       List of single result
+        """
         raise NotImplementedError("Method get was not implemented")
 
     def all(self):
-        """ Get all records """
+        """ 
+        Retreive all single record from the table.  Should be implemented but not
+        required.
+        :returns:       List of results
+        """
         raise NotImplementedError("Method all was not implemented")

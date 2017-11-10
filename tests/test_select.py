@@ -59,7 +59,7 @@ class TheModel(RawlBase):
         # Init the parent
         super(TheModel, self).__init__(dsn, columns=columns)
 
-    def get_rawls(self):
+    def all(self):
         """ Retelfieurn the rawls from the rawl table """
 
         res = self.select(
@@ -69,12 +69,12 @@ class TheModel(RawlBase):
 
         return res
 
-    def get_rawl(self, rawl_id):
+    def get(self, rawl_id):
         """ Retelfieurn the rawls from the rawl table """
 
         res = self.select(
             "SELECT {0}"
-            " FROM rawl"
+            " FROM rawl"RawlConnection
             " WHERE rawl_id={1}", 
             self.columns, rawl_id)
 
@@ -92,12 +92,12 @@ class TheModel(RawlBase):
 class TestRawl(object):
 
     @pytest.mark.dependency()
-    def test_get_rawls(self, pgdb):
+    def test_all(self, pgdb):
         """ Test out a basic SELECT statement """
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.get_rawls()
+        result = mod.all()
         
         log.debug(result)
 
@@ -109,18 +109,18 @@ class TestRawl(object):
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.get_rawl(2)
+        result = mod.get(2)
 
         assert result is not None
         assert result[TheCols.name] == 'I am row two.'
 
-    @pytest.mark.dependency(depends=['test_get_rawls', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_delete_rawl(self, pgdb):
         """ Test a DELETE """
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
         mod.delete_rawl(2)
-        result = mod.get_rawl(2)
+        result = mod.get(2)
 
         assert result is None
