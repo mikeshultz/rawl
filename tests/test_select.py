@@ -62,25 +62,21 @@ class TheModel(RawlBase):
     def get_rawls(self):
         """ Retelfieurn the rawls from the rawl table """
 
-        sql = self._assemble_select(
+        res = self.select(
             "SELECT {0}"
             " FROM rawl;", 
             self.columns)
-
-        res = self._execute(sql)
 
         return res
 
     def get_rawl(self, rawl_id):
         """ Retelfieurn the rawls from the rawl table """
 
-        sql = self._assemble_select(
+        res = self.select(
             "SELECT {0}"
             " FROM rawl"
             " WHERE rawl_id={1}", 
             self.columns, rawl_id)
-
-        res = self._execute(sql)
 
         if len(res) > 0:
             return res[0]
@@ -90,8 +86,7 @@ class TheModel(RawlBase):
     def delete_rawl(self, rawl_id):
         """ Test a delete """
 
-        sql = self._assemble_simple("DELETE FROM rawl WHERE rawl_id={0};", rawl_id)
-        return self._execute(sql, commit=True)
+        return self.query("DELETE FROM rawl WHERE rawl_id={0};", rawl_id, commit=True)
 
 
 class TestRawl(object):

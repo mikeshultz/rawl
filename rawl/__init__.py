@@ -135,6 +135,19 @@ class RawlBase(ABC):
             
         return result
 
+    def query(self, sql_string, *args, **kwargs):
+        """ Execute a query """
+        commit=None
+        if kwargs.get('commit') is not None:
+            commit = kwargs.pop('commit')
+        query = self._assemble_simple(sql_string, *args, **kwargs)
+        return self._execute(query, commit=commit)
+
+    def select(self, sql_string, columns, *args, **kwargs):
+        """ Execute a select """
+        query = self._assemble_select(sql_string, columns, *args, *kwargs)
+        return self._execute(query)
+
     def get(self, id):
         """ Retreive a single record """
         raise NotImplementedError("Method get was not implemented")
