@@ -38,6 +38,7 @@ def pgdb():
     cur = rawlconn.cursor()
     cur.execute(DB_SCHEMA)
     rawlconn.commit()
+    cur.close()
     return pgconn
 
 
@@ -61,9 +62,9 @@ class TheModel(RawlBase):
     def get_rawls(self):
         """ Retelfieurn the rawls from the rawl table """
 
-        sql = self._assemble(
+        sql = self._assemble_select(
             "SELECT {0}"
-            "FROM rawl;", 
+            " FROM rawl;", 
             self.columns)
 
         res = self._execute(sql)
@@ -73,10 +74,10 @@ class TheModel(RawlBase):
     def get_rawl(self, rawl_id):
         """ Retelfieurn the rawls from the rawl table """
 
-        sql = self._assemble(
+        sql = self._assemble_select(
             "SELECT {0}"
             " FROM rawl"
-            " WHERE rawl={1}", 
+            " WHERE rawl_id={1}", 
             self.columns, rawl_id)
 
         res = self._execute(sql)
@@ -89,11 +90,13 @@ class TheModel(RawlBase):
     def delete_rawl(self, rawl_id):
         """ Test a delete """
 
-        return self._execute("DELETE FROM rawl WHERE rawl_id={0};", rawl_id)
+        sql = self._assemble_simple("DELETE FROM rawl WHERE rawl_id={0};", rawl_id)
+        return self._execute(sql, commit=True)
 
 
 class TestRawl(object):
 
+    @pytest.mark.dependency()
     def test_get_rawls(self, pgdb):
         """ Test out a basic SELECT statement """
 
@@ -105,6 +108,7 @@ class TestRawl(object):
 
         assert 'I am row one.' in result[0]
 
+    @pytest.mark.dependency()
     def test_get_single_rawl(self, pgdb):
         """ Test a SELECT WHERE """
 
@@ -112,13 +116,16 @@ class TestRawl(object):
 
         result = mod.get_rawl(2)
 
-        assert 'I am row two.' in result
+        assert result is not None
+        assert result[TheCols.name] == 'I am row two.'
 
+    @pytest.mark.dependency(depends=['test_get_rawls', 'test_get_single_rawl'])
     def test_delete_rawl(self, pgdb):
         """ Test a DELETE """
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.delete_rawl(2)
+        mod.delete_rawl(2)
+        result = mod.get_rawl(2)
 
-        assert mod.get_rawl(2) == []
+        assert result is None

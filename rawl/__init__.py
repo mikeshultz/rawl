@@ -1,7 +1,12 @@
 import logging
+import random
 from abc import ABC
 from psycopg2 import sql
 from psycopg2.pool import ThreadedConnectionPool
+from psycopg2.extensions import (
+    ISOLATION_LEVEL_READ_COMMITTED, 
+    TRANSACTION_STATUS_INTRANS
+)
 
 log = logging.getLogger(__name__)
 
@@ -19,16 +24,23 @@ class RawlConnection(object):
         self.dsn = dsn_string
         self.pool = ThreadedConnectionPool(1, 25, self.dsn)
 
+        self.conn = None
+
     def __enter__(self):
         try: 
             
             log.info("Connecting to %s" % self.dsn)
 
-            conn = self.pool.getconn() 
-            return conn 
+            self.conn = self.pool.getconn()
+            self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
+            return self.conn 
 
         finally: 
-            self.pool.putconn(conn)
+            # Assume rolled back if uncommitted
+            if self.conn.get_transaction_status() == TRANSACTION_STATUS_INTRANS:
+                self.conn.rollback()
+            self.pool.putconn(self.conn)
+            self.conn = None
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val:
@@ -73,31 +85,58 @@ class RawlBase(ABC):
         else:
             raise RawlException("Unknown format for columns")
 
-    def _assemble(self, sql_str, **kwargs):
-        """ Format the provided SQL """
-        # TODO: WTF, design?
-        self.query_string = sql.SQL(sql_str).format(
-            sql.SQL(', ').join([sql.Identifier(x) for x in args[0]]),
-            *[sql.Literal(a) for a in args[1:]]
+    def _assemble_select(self, sql_str, columns, *args, **kwargs):
+        """ For mat a select statement with specific columns """
+        log.debug("sql_str: %s" % sql_str)
+        log.debug("columns: %s" % columns)
+        query_string = sql.SQL(sql_str).format(
+            sql.SQL(', ').join([sql.Identifier(x) for x in columns]),
+            *[sql.Literal(a) for a in args]
             )
-        return self.query_string
+        log.debug("query_string: %s" % query_string)
+        return query_string
 
-    def _execute(self, query=None):
-        if not self.query_string and not query:
-            raise RawlException("No query to execute")
+    def _assemble_simple(self, sql_str, *args, **kwargs):
+        """ Format the provided SQL """
+        
+        query_string = sql.SQL(sql_str).format(
+            *[sql.Literal(a) for a in args]
+            )
+        log.debug("query_string: %s" % query_string)
+
+        return query_string
+
+    def _execute(self, query, commit=False):
+        """ Execute a query with provided parameters 
+
+            Parameters
+            query - SQL string with parameter placeholders
+            commit - If True, the query will commit
+        """
 
         result = []
 
         with RawlConnection(self.dsn) as conn:
 
+            query_id = random.randrange(9999)
+
             curs = conn.cursor()
 
-            log.debug("Executing: %s" % query.as_string(curs) or self.query_string.as_string(curs))
+            log.debug("Executing(%s): %s" % (query_id, query.as_string(curs)))
 
-            curs.execute(query or self.query_string)
+            log.debug("***")
+            log.debug("commit(%s): %s" % (query_id, commit))
+            if commit == True:
+                log.debug("COMMIT(%s)" % query_id)
+                conn.commit()
 
-            result = curs.fetchall()
+            curs.execute(query)
+            log.debug("+++")
+            if curs.rowcount > 0:
+                log.debug("---")
+                result = curs.fetchall()
 
+        log.debug("result(%s): %s" % (query_id, result))
         return result
 
     def get(self, id):
