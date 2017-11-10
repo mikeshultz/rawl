@@ -1,0 +1,26 @@
+import os.path
+from setuptools import setup, find_packages
+
+__DIR__ = os.path.abspath(os.path.dirname(__file__))
+
+setup(
+    name = 'rawl',
+    version = '0.1.0dev1',
+    description = 'An ugly raw SQL postgresql db layer',
+    url = 'https://github.com/mikeshultz/rawl',
+    author = 'Mike Shultz',
+    author_email = 'mike@mikeshultz.com',
+    classifiers = [
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'Topic :: Database',
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+    ],
+    keywords = 'postgresql database bindings sql',
+    packages = find_packages(exclude = ['build', 'dist']),
+    install_requires = open("requirements.txt").readlines(),
+)
