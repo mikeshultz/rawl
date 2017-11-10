@@ -70,6 +70,27 @@ class TheModel(RawlBase):
 
         return res
 
+    def get_rawl(self, rawl_id):
+        """ Retelfieurn the rawls from the rawl table """
+
+        sql = self._assemble(
+            "SELECT {0}"
+            " FROM rawl"
+            " WHERE rawl={1}", 
+            self.columns, rawl_id)
+
+        res = self._execute(sql)
+
+        if len(res) > 0:
+            return res[0]
+        else:
+            return None
+
+    def delete_rawl(self, rawl_id):
+        """ Test a delete """
+
+        return self._execute("DELETE FROM rawl WHERE rawl_id={0};", rawl_id)
+
 
 class TestRawl(object):
 
@@ -78,8 +99,26 @@ class TestRawl(object):
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        statement = mod.get_rawls()
+        result = mod.get_rawls()
         
-        log.debug(statement)
+        log.debug(result)
 
-        assert 'I am row one.' in statement[0]
+        assert 'I am row one.' in result[0]
+
+    def test_get_single_rawl(self, pgdb):
+        """ Test a SELECT WHERE """
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        result = mod.get_rawl(2)
+
+        assert 'I am row two.' in result
+
+    def test_delete_rawl(self, pgdb):
+        """ Test a DELETE """
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        result = mod.delete_rawl(2)
+
+        assert mod.get_rawl(2) == []

@@ -73,11 +73,12 @@ class RawlBase(ABC):
         else:
             raise RawlException("Unknown format for columns")
 
-    def _assemble(self, sql_str, *args):
+    def _assemble(self, sql_str, **kwargs):
         """ Format the provided SQL """
+        # TODO: WTF, design?
         self.query_string = sql.SQL(sql_str).format(
-            sql.SQL(', ').join([sql.Identifier(x) for x in self.columns]),
-            *[sql.Literal(a) for a in args]
+            sql.SQL(', ').join([sql.Identifier(x) for x in args[0]]),
+            *[sql.Literal(a) for a in args[1:]]
             )
         return self.query_string
 
