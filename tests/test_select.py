@@ -24,7 +24,7 @@ INSERT INTO rawl (name) values ('I am row four.');
 
 @pytest.fixture(scope="module")
 def pgdb():
-    pgconn = connect(os.environ.get('PG_DSN', 'psql://localhost:5432/postgres'))
+    pgconn = connect(os.environ.get('PG_DSN', 'postgresql://localhost:5432/postgres'))
     pgconn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     cur = pgconn.cursor()
     cur.execute(DROP_TEST_DB)
@@ -33,7 +33,7 @@ def pgdb():
     
     cur.close()
     
-    rawlconn = connect(os.environ.get('RAWL_DSN', 'psql://localhost:5432/rawl_test'))
+    rawlconn = connect(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
     cur = rawlconn.cursor()
     cur.execute(DB_SCHEMA)
