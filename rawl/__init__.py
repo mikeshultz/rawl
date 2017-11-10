@@ -35,6 +35,9 @@ class RawlConnection(object):
             self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
             return self.conn 
 
+        except Exception:
+            log.exception("Connection failure")
+
         finally: 
             # Assume rolled back if uncommitted
             if self.conn.get_transaction_status() == TRANSACTION_STATUS_INTRANS:
@@ -87,13 +90,12 @@ class RawlBase(ABC):
 
     def _assemble_select(self, sql_str, columns, *args, **kwargs):
         """ For mat a select statement with specific columns """
-        log.debug("sql_str: %s" % sql_str)
-        log.debug("columns: %s" % columns)
+        
         query_string = sql.SQL(sql_str).format(
             sql.SQL(', ').join([sql.Identifier(x) for x in columns]),
             *[sql.Literal(a) for a in args]
             )
-        log.debug("query_string: %s" % query_string)
+        
         return query_string
 
     def _assemble_simple(self, sql_str, *args, **kwargs):
@@ -102,7 +104,6 @@ class RawlBase(ABC):
         query_string = sql.SQL(sql_str).format(
             *[sql.Literal(a) for a in args]
             )
-        log.debug("query_string: %s" % query_string)
 
         return query_string
 
@@ -117,26 +118,21 @@ class RawlBase(ABC):
         result = []
 
         with RawlConnection(self.dsn) as conn:
-
             query_id = random.randrange(9999)
 
             curs = conn.cursor()
+            curs.execute(query)
 
             log.debug("Executing(%s): %s" % (query_id, query.as_string(curs)))
-
-            log.debug("***")
-            log.debug("commit(%s): %s" % (query_id, commit))
             if commit == True:
                 log.debug("COMMIT(%s)" % query_id)
                 conn.commit()
-
-            curs.execute(query)
-            log.debug("+++")
+            
             if curs.rowcount > 0:
-                log.debug("---")
                 result = curs.fetchall()
-
-        log.debug("result(%s): %s" % (query_id, result))
+            
+            curs.close()
+            
         return result
 
     def get(self, id):
