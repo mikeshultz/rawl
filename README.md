@@ -39,6 +39,8 @@ unless necessary.
 
 Here's a very simple example of a model:
 
+    from enum import IntEnum
+    from rawl import RawlBase
     class StateColumns(IntEnum):
         state_id = 0
         name = 1
