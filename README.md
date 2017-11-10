@@ -25,12 +25,11 @@ useful methods:
  - `query` - Executes a query from provided SQL string template and parameters
  - `select` - Executes a query from provided SQL string template, columns, and 
     parameters
+ - `process_columns` - Converts an iterable to a list of strings that represent
+    column names.
 
 These are also available, though not especially inteded to be used by the user 
 unless necessary.
-
- - `_process_columns` - Converts an iterable to a list of strings that represent
-    column names.
  - `_assemble_select` - Put together a compiled Psycopg2 SQL SELECT from an SQL
     string template and query parameters.
  - `_assemble_simple` - Put together a compiled Psycopg2 SQL statement from an 
@@ -42,7 +41,7 @@ Here's a very simple example of a model:
     from enum import IntEnum
     from rawl import RawlBase
 
-    
+
     class StateColumns(IntEnum):
         state_id = 0
         name = 1
@@ -51,7 +50,7 @@ Here's a very simple example of a model:
     class StateModel(RawlBase):
         def __init__(self, dsn):
             # Generate column list from the Enum
-            columns = [str(col).split('.')[1] for col in StateColumns]
+            self.process_columns([str(col).split('.')[1] for col in StateColumns])
 
         def all(self):
             """ Return all state records """
