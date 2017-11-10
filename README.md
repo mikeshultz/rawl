@@ -50,7 +50,12 @@ Here's a very simple example of a model:
     class StateModel(RawlBase):
         def __init__(self, dsn):
             # Generate column list from the Enum
-            self.process_columns([str(col).split('.')[1] for col in StateColumns])
+            columns = [str(col).split('.')[1] for col in StateColumns]
+            # Init the parent
+            super(TheModel, self).__init__(dsn, columns=columns)
+
+            # Do your own init stuff
+            my_init_stuff()
 
         def all(self):
             """ Return all state records """
@@ -64,6 +69,9 @@ Here's a very simple example of a model:
         states = StateModel("postgresql://myUser:myPass@myserver.example.com/my_db")
         for state in states.all():
             print(state[StateColumns.name])
+
+And of course you can add your own methods for various specialty queries or 
+anything you want.
 
 ## Testing
 
