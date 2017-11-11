@@ -96,8 +96,8 @@ class RawlResult(object):
             try:
                 int_k = int(k)
                 return dict.__getitem__(self.data, self.columns[int_k])
-            except ValueError:
-                raise RawlException("Unknown index value %s" % k)
+            except IndexError:
+                raise IndexError("Unknown index value %s" % k)
 
     def __len__(self):
         return len(self.data)
@@ -110,11 +110,6 @@ class RawlResult(object):
 
     def keys(self):
         return self.data.keys()
-
-    def set(self, col, rowdata):
-        """ Set the row data """
-        
-        self.data[col] = rowdata
 
 
 class RawlBase(ABC):

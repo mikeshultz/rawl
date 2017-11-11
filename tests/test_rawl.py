@@ -4,7 +4,7 @@ import logging
 from enum import IntEnum
 from psycopg2 import connect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from rawl import RawlBase, RawlConnection
+from rawl import RawlBase, RawlConnection, RawlException
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +88,11 @@ class TheModel(RawlBase):
 
         return self.query("DELETE FROM rawl WHERE rawl_id={0};", rawl_id, commit=True)
 
+    def delete_rawl_without_commit(self, rawl_id):
+        """ Test a delete """
+
+        return self.query("DELETE FROM rawl WHERE rawl_id={0};", rawl_id, commit=False)
+
 
 class TestRawl(object):
 
@@ -101,6 +106,8 @@ class TestRawl(object):
         
         log.debug(result)
 
+        assert len(result[0]) == 3
+        assert 'rawl_id' in result[0].keys()
         assert 'I am row one.' in result[0]
 
     @pytest.mark.dependency()
@@ -116,14 +123,74 @@ class TestRawl(object):
         assert result is not None
         assert result[TheCols.name] == 'I am row two.'
         assert result.rawl_id == RAWL_ID
+        assert result['rawl_id'] == RAWL_ID
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_delete_rawl(self, pgdb):
         """ Test a DELETE """
 
+        RAWL_ID = 2
+
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        mod.delete_rawl(2)
-        result = mod.get(2)
+        mod.delete_rawl(RAWL_ID)
+        result = mod.get(RAWL_ID)
 
         assert result is None
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_rollback_without_commit(self, pgdb):
+        """ Test a DELETE without a commit """
+
+        RAWL_ID = 3
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        mod.delete_rawl_without_commit(RAWL_ID)
+
+        result = mod.get(RAWL_ID)
+
+        assert result is not None
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_access_invalid_attribute(self, pgdb):
+        """ 
+        Test that an invalid attribute on the result object throws an 
+        exception.
+        """
+
+        RAWL_ID = 3
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        result = mod.get(RAWL_ID)
+
+        try:
+            print(result.invalidAttr)
+            assert False
+        except AttributeError:
+            log.exception("Invalid attr as expected")
+            assert True
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_access_invalid_index(self, pgdb):
+        """ 
+        Test that an invalid column index(in bytes string form) on the result 
+        object throws an exception.
+
+        Notes
+        -----
+        Edge case, but it's there in the code.
+        """
+
+        RAWL_ID = 3
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        result = mod.get(RAWL_ID)
+
+        try:
+            print(result[b"72"])
+            assert False
+        except IndexError as e:
+            assert "Unknown index value" in str(e)
