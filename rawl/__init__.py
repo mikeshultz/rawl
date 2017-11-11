@@ -31,9 +31,6 @@ class RawlConnection(object):
 
         log.debug("Connection init")
 
-        cursor = connection.cursor()
-        cursor.execute("SELECT * from my_table;")
-        results = cursor.fetchall()
         self.dsn = dsn_string
         self.pool = ThreadedConnectionPool(1, 25, self.dsn)
 
@@ -67,17 +64,52 @@ class RawlConnection(object):
 class RawlResult(object):
     """ Represents a row of results retreived from the DB """
 
-    def __init__(self, data_dict):
+    def __init__(self, columns, data_dict):
         self.data = data_dict
+        self.columns = columns
 
     def __getattribute__(self, name):
-        if hasattr(self, name):
-            return object.__getattribute__(self, name)
-        else:
+        # Try for the local objects actual attributes first
+        try:
+            found_attr = object.__getattribute__(self, name)
+            return found_attr
+
+        # Then resort to the data dict
+        except AttributeError:
+
             try:
-                return data['name']
+                return self.data[name]
             except KeyError:
                 raise AttributeError("%s is not available")
+
+    def __getitem__(self, k):
+        # If it's an int, use the int to lookup a column in the position of the
+        # sequence provided.
+        if type(k) == int:
+            return dict.__getitem__(self.data, self.columns[k])
+        # If it's a string, it's a dict lookup
+        elif type(k) == str:
+            return dict.__getitem__(self.data, k)
+        # Anything else and we have no idea how to handle it.
+        else:
+            int_k = None
+            try:
+                int_k = int(k)
+                return dict.__getitem__(self.data, self.columns[int_k])
+            except ValueError:
+                raise RawlException("Unknown index value %s" % k)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __iter__(self):
+        log.debug(self.data)
+        things = self.data.values()
+        for x in things:
+            yield x
+
+    def keys(self):
+        return self.data.keys()
 
     def set(self, col, rowdata):
         """ Set the row data """
@@ -149,10 +181,25 @@ class RawlBase(ABC):
                 conn.commit()
             
             if curs.rowcount > 0:
-                result = curs.fetchall()
+                #result = curs.fetchall()
+                # Process the results into a dict and stuff it in a RawlResult
+                # object.  Then append that object to result
+                result_rows = curs.fetchall()
+                for row in result_rows:
+                    log.debug("--row--")
+                    i = 0
+                    row_dict = {}
+                    for col in self.columns:
+                        log.debug("row_dict[%s] = row[%s] which is %s" % (col, i, row[i]))
+                        row_dict[col] = row[i]
+                        i += 1
+                    log.debug("Appending dict to result: %s" % row_dict)
+                    rr = RawlResult(self.columns, row_dict)
+                    log.debug(rr)
+                    result.append(rr)
             
             curs.close()
-            
+        log.debug("Returning results: %s" % result)
         return result
 
     def process_columns(self, columns):

@@ -107,12 +107,15 @@ class TestRawl(object):
     def test_get_single_rawl(self, pgdb):
         """ Test a SELECT WHERE """
 
+        RAWL_ID = 2
+
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.get(2)
+        result = mod.get(RAWL_ID)
 
         assert result is not None
         assert result[TheCols.name] == 'I am row two.'
+        assert result.rawl_id == RAWL_ID
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_delete_rawl(self, pgdb):
