@@ -52,6 +52,7 @@ Here's a very simple example of a model:
         def __init__(self, dsn):
             # Generate column list from the Enum
             columns = [str(col).split('.')[1] for col in StateColumns]
+            
             # Init the parent
             super(TheModel, self).__init__(dsn, columns=columns)
 
