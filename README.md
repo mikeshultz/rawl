@@ -69,7 +69,10 @@ Here's a very simple example of a model:
     if __name__ == "__main__":
         states = StateModel("postgresql://myUser:myPass@myserver.example.com/my_db")
         for state in states.all():
+            # Print using the Enum
             print(state[StateColumns.name])
+            # Or an attribute
+            print(state.state_id)
 
 And of course you can add your own methods for various specialty queries or 
 anything you want.
