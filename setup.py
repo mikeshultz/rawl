@@ -20,5 +20,6 @@ setup(
     ],
     keywords = 'postgresql database bindings sql',
     packages = find_packages(exclude = ['build', 'dist']),
+    package_data = {'': ['README.md', 'requirements.txt']},
     install_requires = open("requirements.txt").readlines(),
 )
