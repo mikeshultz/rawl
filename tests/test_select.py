@@ -74,7 +74,7 @@ class TheModel(RawlBase):
 
         res = self.select(
             "SELECT {0}"
-            " FROM rawl"RawlConnection
+            " FROM rawl"
             " WHERE rawl_id={1}", 
             self.columns, rawl_id)
 
