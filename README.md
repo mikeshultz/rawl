@@ -1,4 +1,5 @@
 # Rawl
+[![Build Status](https://travis-ci.org/mikeshultz/rawl.svg?branch=master)](https://travis-ci.org/mikeshultz/rawl) [![Coverage Status](https://coveralls.io/repos/github/mikeshultz/rawl/badge.svg?branch=master)](https://coveralls.io/github/mikeshultz/rawl?branch=master)
 
 An odd raw sql abstraction library.  It might suck.
 
