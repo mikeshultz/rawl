@@ -20,6 +20,8 @@ setup(
     ],
     keywords = 'postgresql database bindings sql',
     packages = find_packages(exclude = ['build', 'dist']),
-    package_data = {'': ['README.md', 'requirements.txt']},
-    install_requires = open("requirements.txt").readlines(),
+    package_data = {'': ['README.md']},
+    install_requires = [
+        'psycopg2>=2.7.3.2',
+    ]
 )
