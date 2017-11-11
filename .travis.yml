@@ -1,16 +1,23 @@
 language: python
 python:
-  - "3.5"
-  - "3.6"
+- '3.5'
+- '3.6'
 services:
-  - postgresql
-install: 
-  - pip install .
-  - pip install -r requirements.txt
-  - pip install -r requirements.dev.txt
-  - pip install coveralls
+- postgresql
+install:
+- pip install .
+- pip install -r requirements.txt
+- pip install -r requirements.dev.txt
+- pip install coveralls
 script: coverage run --source rawl -m py.test
 env:
-  - BUILDENV="travis-ci"
-after_success:
-  coveralls
+- BUILDENV="travis-ci"
+after_success: coveralls
+deploy:
+  provider: pypi
+  user: "mikeshultz"
+  password:
+    secure: CtYfMBVDt/RLjaYNmwPhwVnh2lNQxf5DGbbdbHS7UPy5L9S3UQ94LgpK5KwhMFxWMJAUnnS3TQ07B+SBoOfJBZT4rPOUXSKF/QnVqW3lnwTjEmlvyAaKmEXsX7DfKKpQcJrsyEEn/jBP4cVv7DOH+BySZ/TeYd4uJkh28WpSKylmOPuyReNXlJxSh0bvlDXXgbc0u/iJl8nOZFtfHA/uLohpJbGa/gWIVNo5ih+J2z8u51vI+5pS7s9jG+VdmCG8QaD96u2FjjvNyQ7OGNicRrCEWmNxt6biMMFxVM7bZxWPIYDWitERI6n8jlPd/NRaC3i3B3nks2oHWxakOAw9+R/+FuYqqJFjOPcS/EdfblJJ4V4r47ijBcicvF1peIJIFcvsatjzKctjzqA3j4ZHT0Ziqg4o1acH0gzHX6ttzhv7P/Unwz9eOLS/hyaZ+2K/P6Ob1GDfIGOgNSQIERCjy2cPy5uhcboM0EA0URulgohZnFydpD3XOGpXZ+sOVwSRbZrf0ABHASABk6YvZiwB4bRuCG/LXFFI5Az5ITgLv8rZ1m8F7zf014W6aJOkXx47HZ8ZjWz8pufK+sAdNTOG0z+foNQjQf1jkLriq9bjpDnFYE7w5Wp31w9Uw0u2IW2G3nQQRhllZNPMTff5Pcx5v/u+fHS6raRE056Y4EmxeZo=
+  on:
+    branch: master
+    tags: true
