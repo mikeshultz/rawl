@@ -124,6 +124,7 @@ class TestRawl(object):
         assert result[TheCols.name] == 'I am row two.'
         assert result.rawl_id == RAWL_ID
         assert result['rawl_id'] == RAWL_ID
+        assert result[0] == RAWL_ID
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_delete_rawl(self, pgdb):
