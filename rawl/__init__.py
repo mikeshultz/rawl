@@ -117,6 +117,15 @@ class RawlResult(object):
     def keys(self):
         return self._data.keys()
 
+    def values(self):
+        return self._data.values()
+
+    def to_dict(self):
+        return self._data
+
+    def to_list(self):
+        return self.values()
+
 
 class RawlBase(ABC):
     """ And abstract class for creating models out of raw SQL queries """
