@@ -202,6 +202,24 @@ class TestRawl(object):
             assert "Unknown index value" in str(e)
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_insert_dict(self, pgdb):
+        """ 
+        Test that a new rawl entry can be created with insert_dict
+        """
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        orig_result = mod.all()
+        new_row_id = mod.insert_dict({'name': "Row five is alive!"}, commit=True)
+        new_result = mod.all()
+
+        # Test that standard RETURNING is working
+        assert new_row_id == 5
+
+        # Make sure the new one is in the results from all()
+        assert len(new_result) - len(orig_result) == 1
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_serialization(self, pgdb):
         """ 
         Test that a RawlResult object can be serialized properly.
