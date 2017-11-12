@@ -277,7 +277,7 @@ class RawlBase(ABC):
         query = self._assemble_simple(sql_string, *args, **kwargs)
         return self._execute(query, commit=commit, working_columns=columns)
 
-    def select(self, sql_string, columns, *args, **kwargs):
+    def select(self, sql_string, cols, *args, **kwargs):
         """ 
         Execute a SELECT statement 
 
@@ -286,8 +286,11 @@ class RawlBase(ABC):
         :*args:         Arguments to be passed for query parameters.
         :returns:       Psycopg2 result
         """
-        query = self._assemble_select(sql_string, columns, *args, *kwargs)
-        return self._execute(query)
+        working_columns = None
+        if kwargs.get('columns') is not None:
+            working_columns = kwargs.pop('columns')
+        query = self._assemble_select(sql_string, cols, *args, *kwargs)
+        return self._execute(query, working_columns=working_columns)
 
     def insert_dict(self, value_dict, commit=False):
         """ 
@@ -356,7 +359,7 @@ class RawlBase(ABC):
             except ValueError: pass
 
         return self.select(
-            "SELECT {0} FROM " + self.table_name + " WHERE " + self.pk + " = {1};",
+            "SELECT {0} FROM " + self.table + " WHERE " + self.pk + " = {1};",
             self.columns, pk)
 
     def all(self):
@@ -366,5 +369,5 @@ class RawlBase(ABC):
         :returns:       List of results
         """
 
-        return self.select("SELECT {0} FROM " + self.table_name + ";", 
+        return self.select("SELECT {0} FROM " + self.table + ";", 
             self.columns)
