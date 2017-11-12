@@ -1,5 +1,6 @@
 import logging
 import random
+import warnings
 from enum import IntEnum
 from abc import ABC
 from psycopg2 import sql
@@ -9,7 +10,7 @@ from psycopg2.extensions import (
     TRANSACTION_STATUS_INTRANS
 )
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('rawl')
 
 
 class RawlException(Exception): pass
@@ -115,12 +116,22 @@ class RawlResult(object):
 class RawlBase(ABC):
     """ And abstract class for creating models out of raw SQL queries """
 
-    def __init__(self, dsn, columns):
+    def __init__(self, dsn, columns, table_name, pk_name=None):
         self.dsn = dsn
+        self.table = table_name
         self.columns = []
-        self.process_columns(columns)
 
-    def _assemble_select(self, sql_str, columns, *args, **kwargs):
+        # Process the provided columns into a list
+        self.process_columns(columns)
+        
+        # Use primary key provided
+        if pk_name is not None:
+            self.pk = pk_name
+        # Otherwise, assume first column
+        else:
+            self.pk = columns[0]
+
+    def _assemble_with_columns(self, sql_str, columns, *args, **kwargs):
         """ 
         Format a select statement with specific columns 
 
@@ -136,6 +147,12 @@ class RawlBase(ABC):
             )
         
         return query_string
+
+    def _assemble_select(self, sql_str, columns, *args, **kwargs):
+        """ Alias for _assemble_with_columns
+        """
+        warnings.warn("_assemble_select has been depreciated for _assemble_with_columns. It will be removed in a future version.", DeprecationWarning)
+        return self._assemble_with_columns(sql_str, columns, *args, **kwargs)
 
     def _assemble_simple(self, sql_str, *args, **kwargs):
         """ 
@@ -152,24 +169,7 @@ class RawlBase(ABC):
 
         return query_string
 
-    def _assemble_insert(self, sql_str, columns, *args, **kwargs):
-        """ 
-        Format an insert statement with columns and a dynamic range of values
-
-        :sql_str:   An SQL string template
-        :columns:   The columns to be selected and put into {0}
-        :*args:     Arguments to use as query parameters.
-        :returns:   Psycopg2 compiled query
-        """
-        
-        query_string = sql.SQL(sql_str).format(
-            sql.SQL(', ').join([sql.Identifier(x) for x in columns]),
-            sql.SQL(', ').join([sql.Literal(a) for a in args])
-            )
-        
-        return query_string
-
-    def _execute(self, query, commit=False):
+    def _execute(self, query, commit=False, working_columns=None):
         """ 
         Execute a query with provided parameters 
 
@@ -179,15 +179,28 @@ class RawlBase(ABC):
         :returns:   List of rows
         """
 
+        log.debug("RawlBase._execute()")
+
         result = []
 
+        if working_columns is None:
+            working_columns = self.columns
+
         with RawlConnection(self.dsn) as conn:
+
             query_id = random.randrange(9999)
 
             curs = conn.cursor()
+
+            try:
+                log.debug("Executing(%s): %s" % (query_id, query.as_string(curs)))
+            except:
+                log.exception("LOGGING EXCEPTION LOL")
+
             curs.execute(query)
 
-            log.debug("Executing(%s): %s" % (query_id, query.as_string(curs)))
+            log.debug("Executed")
+
             if commit == True:
                 log.debug("COMMIT(%s)" % query_id)
                 conn.commit()
@@ -201,12 +214,14 @@ class RawlBase(ABC):
                     log.debug("--row--")
                     i = 0
                     row_dict = {}
-                    for col in self.columns:
-                        log.debug("row_dict[%s] = row[%s] which is %s" % (col, i, row[i]))
-                        row_dict[col] = row[i]
+                    for col in working_columns:
+                        try:
+                            log.debug("row_dict[%s] = row[%s] which is %s" % (col, i, row[i]))
+                            row_dict[col] = row[i]
+                        except IndexError: pass
                         i += 1
                     log.debug("Appending dict to result: %s" % row_dict)
-                    rr = RawlResult(self.columns, row_dict)
+                    rr = RawlResult(working_columns, row_dict)
                     log.debug(rr)
                     result.append(rr)
             
@@ -240,11 +255,14 @@ class RawlBase(ABC):
         :commit:        Whether or not to commit the transaction after the query
         :returns:       Psycopg2 result
         """
-        commit=None
+        commit = None
+        columns = None
         if kwargs.get('commit') is not None:
             commit = kwargs.pop('commit')
+        if kwargs.get('columns') is not None:
+            columns = kwargs.pop('columns')
         query = self._assemble_simple(sql_string, *args, **kwargs)
-        return self._execute(query, commit=commit)
+        return self._execute(query, commit=commit, working_columns=columns)
 
     def select(self, sql_string, columns, *args, **kwargs):
         """ 
@@ -258,30 +276,75 @@ class RawlBase(ABC):
         query = self._assemble_select(sql_string, columns, *args, *kwargs)
         return self._execute(query)
 
-    def insert(self, sql_string, columns, *args, **kwargs):
+    def insert_dict(self, value_dict, commit=False):
         """ 
-        Execute an INSERT statement 
+        Execute an INSERT statement using a python dict
 
-        :sql_string:    An SQL string template
-        :columns:       A list of columns to be returned by the query
-        :*args:         Arguments to be passed for query parameters.
+        :value_dict:    A dictionary representing all the columns(keys) and 
+            values that should be part of the INSERT statement
+        :commit:        Whether to automatically commit the transaction
         :returns:       Psycopg2 result
         """
-        commit=None
-        if kwargs.get('commit') is not None:
-            commit = kwargs.pop('commit')
-        query = self._assemble_insert(sql_string, columns, *args, *kwargs)
-        return self._execute(query, commit=commit)
+
+        # Sanity check the value_dict
+        for key in value_dict.keys():
+            if key not in self.columns:
+                raise ValueError("Column %s does not exist" % key)
+
+        # These lists will make up the columns and values of the INSERT
+        insert_cols = []
+        value_set = []
+
+        # Go through all the possible columns and look for that column in the
+        # dict.  If available, we need to add it to our col/val sets
+        for col in self.columns:
+            if col in value_dict:
+                log.debug("Inserting with column %s" % col)
+                insert_cols.append(col)
+                value_set.append(value_dict[col])
+
+        # Create SQL statement placeholders for the dynamic values
+        placeholders = ', '.join(["{%s}" % x for x in range(1, len(value_set) + 1)])
+
+        # TODO: Maybe don't trust table_name ane pk_name?  Shouldn't really be 
+        # user input, but who knows.
+        query = self._assemble_with_columns("""
+            INSERT INTO """ + self.table + """ ({0}) 
+            VALUES (""" + placeholders + """) 
+            RETURNING """ + self.pk + """
+            """, insert_cols, *value_set)
+
+        result = self._execute(query, commit=commit)
+
+        # Inca
+        if len(result) > 0:
+            # Return the pk if we can
+            if hasattr(result[0], self.pk):
+                return getattr(result[0], self.pk)
+            # Otherwise, the full result
+            else:
+                return result[0]
+        else:
+            return None
 
     def get(self, pk):
         """ 
-        Retreive a single record from the table.  Should be implemented but not
-        required.
+        Retreive a single record from the table.  Lots of reasons this might be
+        best implemented in the model
 
         :pk:            The primary key ID for the record
         :returns:       List of single result
         """
-        raise NotImplementedError("Method get was not implemented")
+
+        if type(pk) == str:
+            # Probably an int, give it a shot
+            try:
+                pk = int(pk)
+            except ValueError: pass
+
+        return self.select(
+            "SELECT {0} FROM " + self.table_name + " WHERE " + self.pk + " = {1};",
+            self.columns, pk)
 
     def all(self):
         """ 
@@ -289,4 +352,6 @@ class RawlBase(ABC):
         required.
         :returns:       List of results
         """
-        raise NotImplementedError("Method all was not implemented")
+
+        return self.select("SELECT {0} FROM " + self.table_name + ";", 
+            self.columns)
