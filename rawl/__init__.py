@@ -152,6 +152,23 @@ class RawlBase(ABC):
 
         return query_string
 
+    def _assemble_insert(self, sql_str, columns, *args, **kwargs):
+        """ 
+        Format an insert statement with columns and a dynamic range of values
+
+        :sql_str:   An SQL string template
+        :columns:   The columns to be selected and put into {0}
+        :*args:     Arguments to use as query parameters.
+        :returns:   Psycopg2 compiled query
+        """
+        
+        query_string = sql.SQL(sql_str).format(
+            sql.SQL(', ').join([sql.Identifier(x) for x in columns]),
+            sql.SQL(', ').join([sql.Literal(a) for a in args])
+            )
+        
+        return query_string
+
     def _execute(self, query, commit=False):
         """ 
         Execute a query with provided parameters 
@@ -240,6 +257,21 @@ class RawlBase(ABC):
         """
         query = self._assemble_select(sql_string, columns, *args, *kwargs)
         return self._execute(query)
+
+    def insert(self, sql_string, columns, *args, **kwargs):
+        """ 
+        Execute an INSERT statement 
+
+        :sql_string:    An SQL string template
+        :columns:       A list of columns to be returned by the query
+        :*args:         Arguments to be passed for query parameters.
+        :returns:       Psycopg2 result
+        """
+        commit=None
+        if kwargs.get('commit') is not None:
+            commit = kwargs.pop('commit')
+        query = self._assemble_insert(sql_string, columns, *args, *kwargs)
+        return self._execute(query, commit=commit)
 
     def get(self, pk):
         """ 
