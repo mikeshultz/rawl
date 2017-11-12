@@ -124,7 +124,7 @@ class RawlResult(object):
         return self._data
 
     def to_list(self):
-        return self.values()
+        return list(self.values())
 
 
 class RawlBase(ABC):

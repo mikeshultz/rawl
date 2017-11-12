@@ -1,6 +1,7 @@
 import os
 import pytest
 import logging
+import pickle
 from enum import IntEnum
 from psycopg2 import connect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
@@ -199,3 +200,31 @@ class TestRawl(object):
             assert False
         except IndexError as e:
             assert "Unknown index value" in str(e)
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_serialization(self, pgdb):
+        """ 
+        Test that a RawlResult object can be serialized properly.
+        """
+
+        RAWL_ID = 1
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        result = mod.get(RAWL_ID)
+
+        # Test it can be pickled
+        try:
+            pickled_result = pickle.dumps(result)
+            assert True
+        except pickle.PicklingError:
+            assert False
+
+        # Test that it can return dict
+        assert type(result.to_dict()) == dict
+
+        # Test that it can return list
+        assert type(result.to_list()) == list
+
+        # Test that it can be unpickled
+        assert type(pickle.loads(pickled_result)) == RawlResult
