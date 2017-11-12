@@ -68,9 +68,13 @@ Here's a very simple example of a model:
 
         def all(self):
             """ Return all state records """
-            return self.select("SELECT {0} FROM state;", ['name'])
+            return self.select("SELECT {0} FROM state;", self.columns)
 
         def get(self, pk):
+            """ Return all state records """
+            return self.select("SELECT {0} FROM state WHERE state_id = %s;", self.columns, pk)
+
+        def get_name(self, pk):
             """ Return all state records """
             return self.select("SELECT {0} FROM state WHERE state_id = %s;", ['name'], pk)
 
@@ -84,6 +88,26 @@ Here's a very simple example of a model:
 
 And of course you can add your own methods for various specialty queries or 
 anything you want.
+
+### Results
+
+Results returned from any query are always a list of `RawlResult` objects.  You 
+can treat these as if they were `dict`s, `object`s, or `list`s.  For instance:
+
+    results = StateModel().all()
+    for row in results:
+        
+        # These are all the same
+        print(row.state_id)
+        print(row['state_id'])
+        print(row[0])
+
+        # Or iterate through the columns
+        for col in row:
+            print(col)
+
+`RawResult` should be suitable for serialization(pickling), but should you need 
+to convert to a python type, use `RawResult.to_dict()` or `RawResult.to_list()`.
 
 ## Testing
 
