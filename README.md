@@ -48,37 +48,28 @@ Here's a very simple example of a model:
 
     from enum import IntEnum
     from rawl import RawlBase
-
-
-    class StateColumns(IntEnum):
-        state_id = 0
-        name = 1
+    
+    DSN = "postgresql://myUser:myPass@myserver.example.com/my_db"
 
 
     class StateModel(RawlBase):
-        def __init__(self, dsn):
-            # Generate column list from the Enum
-            columns = [str(col).split('.')[1] for col in StateColumns]
-
+        def __init__(self):
             # Init the parent
-            super(TheModel, self).__init__(dsn, columns=columns, table_name='state')
-
-            # Do your own init stuff
-            my_init_stuff()
+            super(TheModel, self).__init__(
+                DSN, 
+                columns=['state_id', 'name'], 
+                table_name='state')
 
         def get_name(self, pk):
             """ My special method returning only a name for a state """
+            
             result = self.select("SELECT {0} FROM state WHERE state_id = %s;", ['name'], pk)
-            if len(result) > 0:
-                # Return first row first column
-                return result[0][0]
-            else:
-                return None
+            
+            # Return first row column 'name'
+            return result[0].name
 
     if __name__ == "__main__":
-        states = StateModel("postgresql://myUser:myPass@myserver.example.com/my_db")
-        for state in states.all():
-            # Print the name of each state
+        for state in StateModel().all(): 
             print(state.name)
 
 And of course you can add your own methods for various specialty queries or 
