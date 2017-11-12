@@ -66,51 +66,56 @@ class RawlResult(object):
     """ Represents a row of results retreived from the DB """
 
     def __init__(self, columns, data_dict):
-        self.data = data_dict
+        self._data = data_dict
         self.columns = columns
 
     def __getattribute__(self, name):
         # Try for the local objects actual attributes first
         try:
-            found_attr = object.__getattribute__(self, name)
-            return found_attr
+            return object.__getattribute__(self, name)
 
         # Then resort to the data dict
         except AttributeError:
-
-            try:
-                return self.data[name]
-            except KeyError:
+            
+            if name in self._data:
+                return self._data[name]
+            else:
                 raise AttributeError("%s is not available")
+
+    def __getstate__(self):
+        return self._data
+
+    def __setstate__(self, state):
+        self._data = state
 
     def __getitem__(self, k):
         # If it's an int, use the int to lookup a column in the position of the
         # sequence provided.
         if type(k) == int:
-            return dict.__getitem__(self.data, self.columns[k])
+            return dict.__getitem__(self._data, self.columns[k])
         # If it's a string, it's a dict lookup
         elif type(k) == str:
-            return dict.__getitem__(self.data, k)
+            return dict.__getitem__(self._data, k)
         # Anything else and we have no idea how to handle it.
         else:
             int_k = None
             try:
                 int_k = int(k)
-                return dict.__getitem__(self.data, self.columns[int_k])
+                return dict.__getitem__(self._data, self.columns[int_k])
             except IndexError:
                 raise IndexError("Unknown index value %s" % k)
 
     def __len__(self):
-        return len(self.data)
+        return len(self._data)
 
     def __iter__(self):
-        log.debug(self.data)
-        things = self.data.values()
+        #log.debug(self.data)
+        things = self._data.values()
         for x in things:
             yield x
 
     def keys(self):
-        return self.data.keys()
+        return self._data.keys()
 
 
 class RawlBase(ABC):
@@ -216,17 +221,16 @@ class RawlBase(ABC):
                     row_dict = {}
                     for col in working_columns:
                         try:
-                            log.debug("row_dict[%s] = row[%s] which is %s" % (col, i, row[i]))
+                            #log.debug("row_dict[%s] = row[%s] which is %s" % (col, i, row[i]))
                             row_dict[col] = row[i]
                         except IndexError: pass
                         i += 1
                     log.debug("Appending dict to result: %s" % row_dict)
                     rr = RawlResult(working_columns, row_dict)
-                    log.debug(rr)
                     result.append(rr)
             
             curs.close()
-        log.debug("Returning results: %s" % result)
+        #log.debug("Returning results: %s" % result)
         return result
 
     def process_columns(self, columns):
@@ -299,7 +303,7 @@ class RawlBase(ABC):
         # dict.  If available, we need to add it to our col/val sets
         for col in self.columns:
             if col in value_dict:
-                log.debug("Inserting with column %s" % col)
+                #log.debug("Inserting with column %s" % col)
                 insert_cols.append(col)
                 value_set.append(value_dict[col])
 
@@ -308,11 +312,11 @@ class RawlBase(ABC):
 
         # TODO: Maybe don't trust table_name ane pk_name?  Shouldn't really be 
         # user input, but who knows.
-        query = self._assemble_with_columns("""
-            INSERT INTO """ + self.table + """ ({0}) 
-            VALUES (""" + placeholders + """) 
-            RETURNING """ + self.pk + """
-            """, insert_cols, *value_set)
+        query = self._assemble_with_columns('''
+            INSERT INTO "''' + self.table + '''" ({0}) 
+            VALUES (''' + placeholders + ''') 
+            RETURNING ''' + self.pk + '''
+            ''', insert_cols, *value_set)
 
         result = self._execute(query, commit=commit)
 
