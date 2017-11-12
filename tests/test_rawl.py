@@ -230,6 +230,20 @@ class TestRawl(object):
         assert len(new_result) - len(orig_result) == 1
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_insert_dict_with_invalid_column(self, pgdb):
+        """ 
+        Test case that an insert_dict with an invalid column fails
+        """
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        try:
+            new_row_id = mod.insert_dict({'not_a_column': "foobar"}, commit=False)
+            assert False
+        except ValueError:
+            assert True
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_serialization(self, pgdb):
         """ 
         Test that a RawlResult object can be serialized properly.
@@ -292,3 +306,17 @@ class TestRawl(object):
 
         # Test that there is the same amount of columns as provided to the model
         assert len(result) == len(mod.columns)
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_get_with_string_pk(self, pgdb):
+        """ 
+        Test case that covers if a string is given as pk to get()
+        """
+
+        RAWL_ID = 5
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        result = mod.get(str(RAWL_ID))[0]
+
+        assert type(result) == RawlResult
