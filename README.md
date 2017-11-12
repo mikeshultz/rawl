@@ -91,8 +91,9 @@ anything you want.
 
 ### Results
 
-Results returned from any query are always a list of `RawlResult` objects.  You 
-can treat these as if they were `dict`s, `object`s, or `list`s.  For instance:
+Unless otherwise altered by the implemented methods, results returned from any 
+query are always a list of `RawlResult` objects.  You can treat these as if 
+they were `dict`s, `object`s, or `list`s.  For instance:
 
     results = StateModel().all()
     for row in results:
