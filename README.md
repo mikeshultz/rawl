@@ -46,7 +46,6 @@ unless necessary.
 
 Here's a very simple example of a model:
 
-    from enum import IntEnum
     from rawl import RawlBase
     
     DSN = "postgresql://myUser:myPass@myserver.example.com/my_db"
@@ -55,7 +54,7 @@ Here's a very simple example of a model:
     class StateModel(RawlBase):
         def __init__(self):
             # Init the parent
-            super(TheModel, self).__init__(DSN, columns=['state_id', 'name'], 
+            super(StateModel, self).__init__(DSN, columns=['state_id', 'name'], 
                 table_name='state')
 
         def get_name(self, pk):
