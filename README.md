@@ -55,15 +55,14 @@ Here's a very simple example of a model:
     class StateModel(RawlBase):
         def __init__(self):
             # Init the parent
-            super(TheModel, self).__init__(
-                DSN, 
-                columns=['state_id', 'name'], 
+            super(TheModel, self).__init__(DSN, columns=['state_id', 'name'], 
                 table_name='state')
 
         def get_name(self, pk):
             """ My special method returning only a name for a state """
             
-            result = self.select("SELECT {0} FROM state WHERE state_id = %s;", ['name'], pk)
+            result = self.select("SELECT {0} FROM state WHERE state_id = %s;", 
+                ['name'], pk)
             
             # Return first row column 'name'
             return result[0].name
