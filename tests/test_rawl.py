@@ -320,3 +320,16 @@ class TestRawl(object):
         result = mod.get(str(RAWL_ID))[0]
 
         assert type(result) == RawlResult
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_single_line_call(self, pgdb):
+        """ 
+        Test single line calls where the model is instantiated and a method is 
+        called at the same time.
+        """
+
+        RAWL_ID = 5
+
+        result = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test')).get(str(RAWL_ID))[0]
+
+        assert type(result) == RawlResult

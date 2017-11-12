@@ -78,10 +78,8 @@ Here's a very simple example of a model:
     if __name__ == "__main__":
         states = StateModel("postgresql://myUser:myPass@myserver.example.com/my_db")
         for state in states.all():
-            # Print using the Enum
-            print(state[StateColumns.name])
-            # Or an attribute
-            print(state.state_id)
+            # Print the name of each state
+            print(state.name)
 
 And of course you can add your own methods for various specialty queries or 
 anything you want.
@@ -92,8 +90,7 @@ Unless otherwise altered by the implemented methods, results returned from any
 query are always a list of `RawlResult` objects.  You can treat these as if 
 they were `dict`s, `object`s, or `list`s.  For instance:
 
-    results = StateModel().all()
-    for row in results:
+    for row in StateModel().all():
         
         # These are all the same
         print(row.state_id)
