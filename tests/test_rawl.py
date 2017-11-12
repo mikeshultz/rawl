@@ -4,7 +4,7 @@ import logging
 from enum import IntEnum
 from psycopg2 import connect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from rawl import RawlBase, RawlConnection, RawlException
+from rawl import RawlBase, RawlConnection, RawlException, RawlResult
 
 log = logging.getLogger(__name__)
 
@@ -106,6 +106,9 @@ class TestRawl(object):
         
         log.debug(result)
 
+        assert result is not None
+        assert type(result) == list
+        assert type(result[0]) == RawlResult
         assert len(result[0]) == 3
         assert 'rawl_id' in result[0].keys()
         assert 'I am row one.' in result[0]
@@ -121,6 +124,7 @@ class TestRawl(object):
         result = mod.get(RAWL_ID)
 
         assert result is not None
+        assert type(result) == RawlResult
         assert result[TheCols.name] == 'I am row two.'
         assert result.rawl_id == RAWL_ID
         assert result['rawl_id'] == RAWL_ID
