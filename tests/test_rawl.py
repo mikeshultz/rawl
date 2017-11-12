@@ -57,7 +57,7 @@ class TheModel(RawlBase):
         log.debug("columns: %s" % columns)
         
         # Init the parent
-        super(TheModel, self).__init__(dsn, columns=columns)
+        super(TheModel, self).__init__(dsn, columns=columns, table_name='rawl')
 
     def all(self):
         """ Retelfieurn the rawls from the rawl table """
