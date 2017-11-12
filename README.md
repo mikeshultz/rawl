@@ -66,17 +66,14 @@ Here's a very simple example of a model:
             # Do your own init stuff
             my_init_stuff()
 
-        def all(self):
-            """ Return all state records """
-            return self.select("SELECT {0} FROM state;", self.columns)
-
-        def get(self, pk):
-            """ Return all state records """
-            return self.select("SELECT {0} FROM state WHERE state_id = %s;", self.columns, pk)
-
         def get_name(self, pk):
-            """ Return all state records """
-            return self.select("SELECT {0} FROM state WHERE state_id = %s;", ['name'], pk)
+            """ My special method returning only a name for a state """
+            result = self.select("SELECT {0} FROM state WHERE state_id = %s;", ['name'], pk)
+            if len(result) > 0:
+                # Return first row first column
+                return result[0][0]
+            else:
+                return None
 
     if __name__ == "__main__":
         states = StateModel("postgresql://myUser:myPass@myserver.example.com/my_db")
@@ -124,3 +121,11 @@ Run pytest with the following environmental variables.
 The `-v` switch is for logging verbosity.  Add more `v`'s for a lower log level.  For example:
 
     PG_DSN="postgresql://myUser:myPassword@db.example.com:5432/postgres" RAWL_DSN="postgresql://myUser:myPassword@db.example.com:5432/rawl_test" pytest -s -vvvv
+
+## Release
+
+This should take care of doing a release(including a PyPi release)
+
+ - Bump version in `setup.py` and commit
+ - Tag version(e.g. `git tag v0.1.0b1`)
+ - Push to `origin`
