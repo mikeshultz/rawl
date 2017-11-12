@@ -6,8 +6,8 @@ An odd raw sql abstraction library.  It might suck.
 **NOTE**: This is not an ORM, nor intended to hide the database.  It's more or 
 less a wrapper around [psycopg2](http://initd.org/psycopg/docs/).  It __will 
 not__ create the database for you, either.  Nor should it!  __Proper database 
-design can not be done at the code level.__  That said, with some care you can 
-execute a set of queries to create your schema if needed.  See the tests for an 
+design can not be abstracted away.__  That said, with some care you can execute 
+a set of queries to create your schema if needed.  See the tests for an 
 example.
 
 ## Usage
