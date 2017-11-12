@@ -60,12 +60,12 @@ class TheModel(RawlBase):
         # Init the parent
         super(TheModel, self).__init__(dsn, columns=columns, table_name='rawl')
 
-    def get_rawls_special(self, rawl_id):
+    def select_rawls_with_extra_column(self, rawl_id):
         """ Return the rawls from the rawl table but in a way to test more stuff 
         """
 
         # We're adding an arbitrary column in
-        cols = self.columns
+        cols = self.columns.copy()
         cols.append('foo')
 
         res = self.select(
@@ -79,14 +79,14 @@ class TheModel(RawlBase):
         else:
             return None
 
-    def query_rawls_special(self, rawl_id):
+    def query_rawls_with_asterisk(self, rawl_id):
         """ Test out self.query directly using columns
         """
 
         res = self.query(
             "SELECT *"
             " FROM rawl"
-            " WHERE rawl_id={1}", 
+            " WHERE rawl_id={0}", 
             rawl_id, columns=self.columns)
 
         if len(res) > 0:
@@ -258,29 +258,37 @@ class TestRawl(object):
         assert type(pickle.loads(pickled_result)) == RawlResult
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
-    def test_serialization(self, pgdb):
+    def test_select_with_columns(self, pgdb):
         """ 
-        Test an edge case with 
+        Test a case with a select query with different columns that given
+        for formatting.
         """
 
-        RAWL_ID = 1
+        RAWL_ID = 5
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.get(RAWL_ID)[0]
+        result = mod.select_rawls_with_extra_column(RAWL_ID)
 
-        # Test it can be pickled
-        try:
-            pickled_result = pickle.dumps(result)
-            assert True
-        except pickle.PicklingError:
-            assert False
+        assert type(result) == RawlResult
 
-        # Test that it can return dict
-        assert type(result.to_dict()) == dict
+        # Test that there is one extra column
+        assert len(result) == len(mod.columns) + 1
 
-        # Test that it can return list
-        assert type(result.to_list()) == list
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_query_with_columns(self, pgdb):
+        """ 
+        Test a case with a query with an asterisk for columns so result columns
+        must be specified
+        """
 
-        # Test that it can be unpickled
-        assert type(pickle.loads(pickled_result)) == RawlResult
+        RAWL_ID = 5
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        result = mod.query_rawls_with_asterisk(RAWL_ID)
+
+        assert type(result) == RawlResult
+
+        # Test that there is the same amount of columns as provided to the model
+        assert len(result) == len(mod.columns)
