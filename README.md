@@ -3,6 +3,13 @@
 
 An odd raw sql abstraction library.  It might suck.
 
+**NOTE**: This is not an ORM, nor intended to hide the database.  It's more or 
+less a wrapper around [psycopg2](http://initd.org/psycopg/docs/).  It __will 
+not__ create the database for you, either.  Nor should it!  __Proper database 
+design can not be done at the code level.__  That said, with some care you can 
+execute a set of queries to create your schema if needed.  See the tests for an 
+example.
+
 ## Usage
 
 ### Simple Connection
@@ -52,9 +59,9 @@ Here's a very simple example of a model:
         def __init__(self, dsn):
             # Generate column list from the Enum
             columns = [str(col).split('.')[1] for col in StateColumns]
-            
+
             # Init the parent
-            super(TheModel, self).__init__(dsn, columns=columns)
+            super(TheModel, self).__init__(dsn, columns=columns, table_name='state')
 
             # Do your own init stuff
             my_init_stuff()
