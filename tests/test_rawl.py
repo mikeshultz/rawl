@@ -60,24 +60,34 @@ class TheModel(RawlBase):
         # Init the parent
         super(TheModel, self).__init__(dsn, columns=columns, table_name='rawl')
 
-    def all(self):
-        """ Retelfieurn the rawls from the rawl table """
+    def get_rawls_special(self, rawl_id):
+        """ Return the rawls from the rawl table but in a way to test more stuff 
+        """
+
+        # We're adding an arbitrary column in
+        cols = self.columns
+        cols.append('foo')
 
         res = self.select(
-            "SELECT {0}"
-            " FROM rawl;", 
-            self.columns)
-
-        return res
-
-    def get(self, rawl_id):
-        """ Retelfieurn the rawls from the rawl table """
-
-        res = self.select(
-            "SELECT {0}"
+            "SELECT {0}, TRUE"
             " FROM rawl"
             " WHERE rawl_id={1}", 
-            self.columns, rawl_id)
+            self.columns, rawl_id, columns=cols)
+
+        if len(res) > 0:
+            return res[0]
+        else:
+            return None
+
+    def query_rawls_special(self, rawl_id):
+        """ Test out self.query directly using columns
+        """
+
+        res = self.query(
+            "SELECT *"
+            " FROM rawl"
+            " WHERE rawl_id={1}", 
+            rawl_id, columns=self.columns)
 
         if len(res) > 0:
             return res[0]
@@ -122,7 +132,7 @@ class TestRawl(object):
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.get(RAWL_ID)
+        result = mod.get(RAWL_ID)[0]
 
         assert result is not None
         assert type(result) == RawlResult
@@ -142,7 +152,7 @@ class TestRawl(object):
         mod.delete_rawl(RAWL_ID)
         result = mod.get(RAWL_ID)
 
-        assert result is None
+        assert result == []
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_rollback_without_commit(self, pgdb):
@@ -156,7 +166,7 @@ class TestRawl(object):
 
         result = mod.get(RAWL_ID)
 
-        assert result is not None
+        assert len(result) > 0
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_access_invalid_attribute(self, pgdb):
@@ -169,7 +179,7 @@ class TestRawl(object):
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.get(RAWL_ID)
+        result = mod.get(RAWL_ID)[0]
 
         try:
             print(result.invalidAttr)
@@ -193,7 +203,7 @@ class TestRawl(object):
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.get(RAWL_ID)
+        result = mod.get(RAWL_ID)[0]
 
         try:
             print(result[b"72"])
@@ -229,7 +239,35 @@ class TestRawl(object):
 
         mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
 
-        result = mod.get(RAWL_ID)
+        result = mod.get(RAWL_ID)[0]
+
+        # Test it can be pickled
+        try:
+            pickled_result = pickle.dumps(result)
+            assert True
+        except pickle.PicklingError:
+            assert False
+
+        # Test that it can return dict
+        assert type(result.to_dict()) == dict
+
+        # Test that it can return list
+        assert type(result.to_list()) == list
+
+        # Test that it can be unpickled
+        assert type(pickle.loads(pickled_result)) == RawlResult
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_serialization(self, pgdb):
+        """ 
+        Test an edge case with 
+        """
+
+        RAWL_ID = 1
+
+        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+
+        result = mod.get(RAWL_ID)[0]
 
         # Test it can be pickled
         try:
