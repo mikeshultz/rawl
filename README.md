@@ -54,8 +54,8 @@ Here's a very simple example of a model:
     class StateModel(RawlBase):
         def __init__(self):
             # Init the parent
-            super(StateModel, self).__init__(DSN, columns=['state_id', 'name'], 
-                table_name='state')
+            super(StateModel, self).__init__(DSN, table_name='state', 
+                columns=['state_id', 'name'])
 
         def get_name(self, pk):
             """ My special method returning only a name for a state """
