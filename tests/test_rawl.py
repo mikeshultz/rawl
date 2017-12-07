@@ -23,6 +23,8 @@ INSERT INTO rawl (name) values ('I am row three.');
 INSERT INTO rawl (name) values ('I am row four.');
 """
 
+RAWL_DSN = os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test')
+
 @pytest.fixture(scope="module")
 def pgdb():
     pgconn = connect(os.environ.get('PG_DSN', 'postgresql://localhost:5432/postgres'))
@@ -34,7 +36,7 @@ def pgdb():
     
     cur.close()
     
-    rawlconn = connect(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+    rawlconn = connect(RAWL_DSN)
 
     cur = rawlconn.cursor()
     cur.execute(DB_SCHEMA)
@@ -111,7 +113,7 @@ class TestRawl(object):
     def test_all(self, pgdb):
         """ Test out a basic SELECT statement """
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         result = mod.all()
         
@@ -130,7 +132,7 @@ class TestRawl(object):
 
         RAWL_ID = 2
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         result = mod.get(RAWL_ID)[0]
 
@@ -147,7 +149,7 @@ class TestRawl(object):
 
         RAWL_ID = 2
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         mod.delete_rawl(RAWL_ID)
         result = mod.get(RAWL_ID)
@@ -160,7 +162,7 @@ class TestRawl(object):
 
         RAWL_ID = 3
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         mod.delete_rawl_without_commit(RAWL_ID)
 
@@ -177,7 +179,7 @@ class TestRawl(object):
 
         RAWL_ID = 3
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         result = mod.get(RAWL_ID)[0]
 
@@ -201,7 +203,7 @@ class TestRawl(object):
 
         RAWL_ID = 3
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         result = mod.get(RAWL_ID)[0]
 
@@ -217,7 +219,7 @@ class TestRawl(object):
         Test that a new rawl entry can be created with insert_dict
         """
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         orig_result = mod.all()
         new_row_id = mod.insert_dict({'name': "Row five is alive!"}, commit=True)
@@ -235,7 +237,7 @@ class TestRawl(object):
         Test case that an insert_dict with an invalid column fails
         """
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         try:
             new_row_id = mod.insert_dict({'not_a_column': "foobar"}, commit=False)
@@ -251,7 +253,7 @@ class TestRawl(object):
 
         RAWL_ID = 1
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         result = mod.get(RAWL_ID)[0]
 
@@ -280,7 +282,7 @@ class TestRawl(object):
 
         RAWL_ID = 5
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         result = mod.select_rawls_with_extra_column(RAWL_ID)
 
@@ -298,7 +300,7 @@ class TestRawl(object):
 
         RAWL_ID = 5
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         result = mod.query_rawls_with_asterisk(RAWL_ID)
 
@@ -315,7 +317,7 @@ class TestRawl(object):
 
         RAWL_ID = 5
 
-        mod = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test'))
+        mod = TheModel(RAWL_DSN)
 
         result = mod.get(str(RAWL_ID))[0]
 
@@ -330,6 +332,6 @@ class TestRawl(object):
 
         RAWL_ID = 5
 
-        result = TheModel(os.environ.get('RAWL_DSN', 'postgresql://localhost:5432/rawl_test')).get(str(RAWL_ID))[0]
+        result = TheModel(RAWL_DSN).get(str(RAWL_ID))[0]
 
         assert type(result) == RawlResult
