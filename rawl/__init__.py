@@ -12,6 +12,8 @@ from psycopg2.extensions import (
 
 log = logging.getLogger('rawl')
 
+_POOL = None
+
 
 class RawlException(Exception): pass
 
@@ -33,7 +35,11 @@ class RawlConnection(object):
         log.debug("Connection init")
 
         self.dsn = dsn_string
-        self.pool = ThreadedConnectionPool(1, 25, self.dsn)
+
+        # Create the pool if it doesn't exist already
+        global _POOL
+        if _POOL is None:
+            _POOL = ThreadedConnectionPool(1, 25, self.dsn)
 
         self.conn = None
 
@@ -42,8 +48,9 @@ class RawlConnection(object):
             
             log.info("Connecting to %s" % self.dsn)
 
-            self.conn = self.pool.getconn()
-            self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
+            self.conn = _POOL.getconn()
+            if self.conn.get_transaction_status() != TRANSACTION_STATUS_INTRANS:
+                self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
             return self.conn
 
         except Exception:
@@ -53,7 +60,7 @@ class RawlConnection(object):
             # Assume rolled back if uncommitted
             if self.conn.get_transaction_status() == TRANSACTION_STATUS_INTRANS:
                 self.conn.rollback()
-            self.pool.putconn(self.conn)
+            _POOL.putconn(self.conn)
             self.conn = None
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -83,7 +90,7 @@ class RawlResult(object):
             if name in self._data:
                 return self._data[name]
             else:
-                raise AttributeError("%s is not available")
+                raise AttributeError("%s is not available" % name)
 
     def __getstate__(self):
         return self._data
@@ -236,27 +243,33 @@ class RawlBase(ABC):
                 log.debug("COMMIT(%s)" % query_id)
                 conn.commit()
             
+            log.debug("curs.rowcount: %s" % curs.rowcount)
+            
             if curs.rowcount > 0:
                 #result = curs.fetchall()
                 # Process the results into a dict and stuff it in a RawlResult
                 # object.  Then append that object to result
                 result_rows = curs.fetchall()
                 for row in result_rows:
-                    log.debug("--row--")
+                    
                     i = 0
                     row_dict = {}
                     for col in working_columns:
                         try:
                             #log.debug("row_dict[%s] = row[%s] which is %s" % (col, i, row[i]))
+                            # For aliased columns, we need to get rid of the dot
+                            col = col.replace('.', '_')
                             row_dict[col] = row[i]
                         except IndexError: pass
                         i += 1
+                    
                     log.debug("Appending dict to result: %s" % row_dict)
+                    
                     rr = RawlResult(working_columns, row_dict)
                     result.append(rr)
             
             curs.close()
-        #log.debug("Returning results: %s" % result)
+
         return result
 
     def process_columns(self, columns):
