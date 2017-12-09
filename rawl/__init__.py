@@ -7,8 +7,13 @@ from psycopg2 import sql
 from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extensions import (
     ISOLATION_LEVEL_READ_COMMITTED, 
-    TRANSACTION_STATUS_INTRANS
+    TRANSACTION_STATUS_INTRANS,
+    TRANSACTION_STATUS_ACTIVE,
+    TRANSACTION_STATUS_INERROR
 )
+
+OPEN_TRANSACTION_STATES = (TRANSACTION_STATUS_INTRANS, 
+    TRANSACTION_STATUS_ACTIVE, TRANSACTION_STATUS_INERROR)
 
 log = logging.getLogger('rawl')
 
@@ -49,9 +54,7 @@ class RawlConnection(object):
             log.info("Connecting to %s" % self.dsn)
 
             self.conn = _POOL.getconn()
-            if self.conn.get_transaction_status() not in (
-                TRANSACTION_STATUS_INTRANS, TRANSACTION_STATUS_ACTIVE,
-                TRANSACTION_STATUS_INERROR):
+            if self.conn.get_transaction_status() not in OPEN_TRANSACTION_STATES:
                 self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
             return self.conn
 
@@ -60,7 +63,7 @@ class RawlConnection(object):
 
         finally: 
             # Assume rolled back if uncommitted
-            if self.conn.get_transaction_status() == TRANSACTION_STATUS_INTRANS:
+            if self.conn.get_transaction_status() in OPEN_TRANSACTION_STATES:
                 self.conn.rollback()
             _POOL.putconn(self.conn)
             self.conn = None
