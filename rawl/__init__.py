@@ -49,7 +49,9 @@ class RawlConnection(object):
             log.info("Connecting to %s" % self.dsn)
 
             self.conn = _POOL.getconn()
-            if self.conn.get_transaction_status() != TRANSACTION_STATUS_INTRANS:
+            if self.conn.get_transaction_status() not in (
+                TRANSACTION_STATUS_INTRANS, TRANSACTION_STATUS_ACTIVE,
+                TRANSACTION_STATUS_INERROR):
                 self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
             return self.conn
 
