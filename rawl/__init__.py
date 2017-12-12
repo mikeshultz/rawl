@@ -1,3 +1,58 @@
+# -*- coding: utf-8 -*-
+""" Rawl
+https://github.com/mikeshultz/rawl
+
+This module is a simple database abstraction trying to balance the the 
+usefulness of an ORM with the lack of constraints and flexibility of rawl SQL.
+
+Note: 
+    This is not an ORM, nor intended to hide the database. It's more or less a
+    wrapper around psycopg2. It will not create the database for you, either.
+    Nor should it! Proper database design can not be abstracted away. That said,
+    with some care you can execute a set of queries to create your schema if
+    needed. See the tests for an example.
+
+Example:
+    from rawl import RawlBase
+
+    DSN = "postgresql://myUser:myPass@myserver.example.com/my_db"
+
+
+    class StateModel(RawlBase):
+        def __init__(self):
+            # Init the parent
+            super(StateModel, self).__init__(DSN, table_name='state', 
+                columns=['state_id', 'name'])
+
+        def get_name(self, pk):
+            ''' My special method returning only a name for a state '''
+            
+            result = self.select("SELECT {0} FROM state WHERE state_id = %s;", 
+                self.columns, pk)
+            
+            # Return first row with all columns
+            return result[0].name
+
+    if __name__ == "__main__":
+        for state in StateModel().all(): 
+            print(state.name)
+
+License:
+    Copyright (C) 2017 Mike Shultz
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
 import logging
 import random
 import warnings
