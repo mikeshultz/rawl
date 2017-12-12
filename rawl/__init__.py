@@ -2,8 +2,8 @@
 """ Rawl
 https://github.com/mikeshultz/rawl
 
-This module is a simple database abstraction trying to balance the the 
-usefulness of an ORM with the lack of constraints and flexibility of rawl SQL.
+This module is a simple database abstraction trying to balance the usefulness of
+an ORM with the lack of constraints and flexibility of rawl SQL.
 
 Note: 
     This is not an ORM, nor intended to hide the database. It's more or less a
