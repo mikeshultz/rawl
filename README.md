@@ -93,6 +93,13 @@ they were `dict`s, `object`s, or `list`s.  For instance:
 `RawResult` should be suitable for serialization(pickling), but should you need 
 to convert to a python type, use `RawResult.to_dict()` or `RawResult.to_list()`.
 
+### JSON Encoding
+
+In case you want to convert your query results directly to a JSON string for 
+output, you can use RawlJSONEncoder.
+
+    json.dumps(StateModel().all(), cls=RawlJSONEncoder)
+
 ## Testing
 
 Install the dependencies.

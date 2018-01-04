@@ -2,10 +2,17 @@ import os
 import pytest
 import logging
 import pickle
+import json
 from enum import IntEnum
 from psycopg2 import connect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from rawl import RawlBase, RawlConnection, RawlException, RawlResult
+from rawl import (
+    RawlBase,
+    RawlConnection,
+    RawlException,
+    RawlResult,
+    RawlJSONEncoder
+)
 
 log = logging.getLogger(__name__)
 
@@ -272,6 +279,27 @@ class TestRawl(object):
 
         # Test that it can be unpickled
         assert type(pickle.loads(pickled_result)) == RawlResult
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_json_serialization(self, pgdb):
+        """ 
+        Test that a RawlResult object can be serialized properly.
+        """
+
+        RAWL_ID = 1
+
+        mod = TheModel(RAWL_DSN)
+
+        result = mod.all()
+
+        try:
+            json.dumps(result, cls=RawlJSONEncoder)
+            assert True
+        except TypeError as e:
+            if 'serializable' in str(e):
+                assert False
+            else:
+                raise e
 
     @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
     def test_select_with_columns(self, pgdb):

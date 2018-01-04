@@ -58,6 +58,8 @@ import random
 import warnings
 from enum import IntEnum
 from abc import ABC
+from json import JSONEncoder
+from datetime import datetime
 from psycopg2 import sql
 from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extensions import (
@@ -460,3 +462,18 @@ class RawlBase(ABC):
 
         return self.select("SELECT {0} FROM " + self.table + ";", 
             self.columns)
+
+class RawlJSONEncoder(JSONEncoder):
+    """ 
+    A JSON encoder that can be used with json.dumps
+
+    Usage
+    -----
+    json.dumps(cls=RawlJSONEncoder)
+    """
+    def default(self, o):
+        if type(o) == datetime:
+            return o.isoformat()
+        elif type(o) == RawlResult:
+            return o.to_dict()
+        return JSONEncoder.default(self, o)
