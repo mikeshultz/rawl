@@ -56,11 +56,12 @@ License:
 import logging
 import random
 import warnings
+import decimal
 from enum import IntEnum
 from abc import ABC
+from json import JSONEncoder
 from datetime import datetime
 from psycopg2 import sql
-from psycopg2.extras import json
 from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extensions import (
     STATUS_IN_TRANSACTION,
@@ -463,7 +464,7 @@ class RawlBase(ABC):
         return self.select("SELECT {0} FROM " + self.table + ";", 
             self.columns)
 
-class RawlJSONEncoder(json.JSONEncoder):
+class RawlJSONEncoder(JSONEncoder):
     """ 
     A JSON encoder that can be used with json.dumps
 
@@ -476,4 +477,4 @@ class RawlJSONEncoder(json.JSONEncoder):
             return o.isoformat()
         elif type(o) == RawlResult:
             return o.to_dict()
-        return json.JSONEncoder.default(self, o)
+        return super(RawlJSONEncoder, self).default(o)
