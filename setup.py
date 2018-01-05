@@ -5,7 +5,7 @@ __DIR__ = os.path.abspath(os.path.dirname(__file__))
 
 setup(
     name = 'rawl',
-    version = '0.2.5b1',
+    version = '0.2.6b1',
     description = 'An ugly raw SQL postgresql db layer',
     url = 'https://github.com/mikeshultz/rawl',
     author = 'Mike Shultz',

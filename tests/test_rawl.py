@@ -363,3 +363,18 @@ class TestRawl(object):
         result = TheModel(RAWL_DSN).get(str(RAWL_ID))[0]
 
         assert type(result) == RawlResult
+
+    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    def test_dict_assignment(self, pgdb):
+        """ 
+        This test tries to assign something to RawlResult as if it were a dict
+        """
+
+        RAWL_ID = 5
+        NAME = 'Shoopadoop'
+
+        result = TheModel(RAWL_DSN).get(RAWL_ID)
+
+        result[0]['name'] = NAME
+
+        assert result[0].name == NAME

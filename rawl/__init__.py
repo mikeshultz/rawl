@@ -177,6 +177,23 @@ class RawlResult(object):
             except IndexError:
                 raise IndexError("Unknown index value %s" % k)
 
+    def __setitem__(self, k, v):
+        # If it's an int, use the int to lookup a column in the position of the
+        # sequence provided.
+        if type(k) == int:
+            return dict.__setitem__(self._data, self.columns[k], v)
+        # If it's a string, it's a dict lookup
+        elif type(k) == str:
+            return dict.__setitem__(self._data, k, v)
+        # Anything else and we have no idea how to handle it.
+        else:
+            int_k = None
+            try:
+                int_k = int(k)
+                return dict.__setitem__(self._data, self.columns[int_k], v)
+            except IndexError:
+                raise IndexError("Unknown index value %s" % k)
+
     def __len__(self):
         return len(self._data)
 
