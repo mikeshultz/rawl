@@ -4,7 +4,7 @@ jobs:
   pytest:
     name: Test (pytest)
     runs-on: ubuntu-latest
-    container: alpine
+    container: ubuntu
     services:
       postgres:
         image: postgres
