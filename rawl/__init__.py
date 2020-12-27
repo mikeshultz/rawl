@@ -5,7 +5,7 @@ https://github.com/mikeshultz/rawl
 This module is a simple database abstraction trying to balance the usefulness of
 an ORM with the lack of constraints and flexibility of rawl SQL.
 
-Note: 
+Note:
     This is not an ORM, nor intended to hide the database. It's more or less a
     wrapper around psycopg2. It will not create the database for you, either.
     Nor should it! Proper database design can not be abstracted away. That said,
@@ -26,10 +26,10 @@ Example:
 
         def get_name(self, pk):
             ''' My special method returning only a name for a state '''
-            
+
             result = self.select("SELECT {0} FROM state WHERE state_id = %s;", 
                 self.columns, pk)
-            
+
             # Return first row with all columns
             return result[0].name
 
@@ -310,7 +310,7 @@ class RawlBase(ABC):
                 conn = self._open_conn
             else:
                 conn = given_conn
-                if commit is not True:
+                if not commit:
                     self._open_conn = conn
 
             query_id = random.randrange(9999)
@@ -326,7 +326,7 @@ class RawlBase(ABC):
 
             log.debug("Executed")
 
-            if commit is True:
+            if commit:
                 log.debug("COMMIT(%s)" % query_id)
                 conn.commit()
 
@@ -493,7 +493,7 @@ class RawlBase(ABC):
         Commit an already open transaction
         TODO: Deal with open tx states
         """
-        with RawlConnection(self.dsn) as conn:
+        with RawlConnection(self.dsn, close_on_exit=True) as conn:
             conn.commit()
 
 
