@@ -111,7 +111,7 @@ class RawlConnection(object):
         conn = None
 
         try:
-            conn = self.get_conn()  
+            conn = self.get_conn()
             return conn
 
         except Exception:
