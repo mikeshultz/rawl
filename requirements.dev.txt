@@ -1,4 +1,4 @@
-flake8>=3.8.4
+black>=20.8b1
 pytest>=3.2.3
 pytest-logging>=2015.11.4
 pytest-dependency>=0.2

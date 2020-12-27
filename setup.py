@@ -4,13 +4,13 @@ from setuptools import setup, find_packages
 __DIR__ = os.path.abspath(os.path.dirname(__file__))
 
 setup(
-    name = 'rawl',
-    version = '0.2.6b1',
-    description = 'An ugly raw SQL postgresql db layer',
-    url = 'https://github.com/mikeshultz/rawl',
-    author = 'Mike Shultz',
-    author_email = 'mike@mikeshultz.com',
-    classifiers = [
+    name='rawl',
+    version='0.2.6b1',
+    description='An ugly raw SQL postgresql db layer',
+    url='https://github.com/mikeshultz/rawl',
+    author='Mike Shultz',
+    author_email='mike@mikeshultz.com',
+    classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Topic :: Database',
@@ -18,10 +18,10 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
     ],
-    keywords = 'postgresql database bindings sql',
-    packages = find_packages(exclude = ['build', 'dist']),
-    package_data = {'': ['README.md']},
-    install_requires = [
+    keywords='postgresql database bindings sql',
+    packages=find_packages(exclude=['build', 'dist']),
+    package_data={'': ['README.md']},
+    install_requires=[
         'psycopg2>=2.7.3.2',
     ]
 )
