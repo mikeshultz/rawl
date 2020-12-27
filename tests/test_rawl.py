@@ -150,7 +150,7 @@ class TestRawl(object):
         assert result['rawl_id'] == RAWL_ID
         assert result[0] == RAWL_ID
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_delete_rawl(self, pgdb):
         """ Test a DELETE """
 
@@ -163,7 +163,7 @@ class TestRawl(object):
 
         assert result == []
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_rollback_without_commit(self, pgdb):
         """ Test a DELETE without a commit """
 
@@ -177,7 +177,7 @@ class TestRawl(object):
 
         assert len(result) > 0
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_access_invalid_attribute(self, pgdb):
         """ 
         Test that an invalid attribute on the result object throws an 
@@ -197,7 +197,7 @@ class TestRawl(object):
             log.exception("Invalid attr as expected")
             assert True
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_access_invalid_index(self, pgdb):
         """ 
         Test that an invalid column index(in bytes string form) on the result 
@@ -220,7 +220,7 @@ class TestRawl(object):
         except IndexError as e:
             assert "Unknown index value" in str(e)
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_insert_dict(self, pgdb):
         """ 
         Test that a new rawl entry can be created with insert_dict
@@ -238,7 +238,35 @@ class TestRawl(object):
         # Make sure the new one is in the results from all()
         assert len(new_result) - len(orig_result) == 1
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
+    def test_insert_dict_without_commit(self, pgdb):
+        """ 
+        Test that multople insert_dicts can happen in one transaction
+        """
+
+        mod = TheModel(RAWL_DSN)
+
+        orig_result = mod.all()
+        new_row_id = mod.insert_dict({'name': "Row five is alive!"}, commit=False)
+        new_result = mod.all()
+
+        # Test that standard RETURNING is working
+        assert new_row_id == 6
+
+        # Make sure the new one is in the results from all()
+        assert len(new_result) == len(orig_result)
+
+        newer_row_id = mod.insert_dict({'name': "Row six of sticks!"}, commit=False)
+        newer_result = mod.all()
+        assert newer_row_id == 7
+        assert len(newer_result) == len(orig_result)
+
+        mod.commit()
+
+        newest_result = mod.all()
+        assert len(newest_result) - len(orig_result) == 2
+
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_insert_dict_with_invalid_column(self, pgdb):
         """ 
         Test case that an insert_dict with an invalid column fails
@@ -252,7 +280,7 @@ class TestRawl(object):
         except ValueError:
             assert True
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_serialization(self, pgdb):
         """ 
         Test that a RawlResult object can be serialized properly.
@@ -280,7 +308,7 @@ class TestRawl(object):
         # Test that it can be unpickled
         assert type(pickle.loads(pickled_result)) == RawlResult
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_json_serialization(self, pgdb):
         """ 
         Test that a RawlResult object can be serialized properly.
@@ -301,7 +329,7 @@ class TestRawl(object):
             else:
                 raise e
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_select_with_columns(self, pgdb):
         """ 
         Test a case with a select query with different columns that given
@@ -319,7 +347,7 @@ class TestRawl(object):
         # Test that there is one extra column
         assert len(result) == len(mod.columns) + 1
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_query_with_columns(self, pgdb):
         """ 
         Test a case with a query with an asterisk for columns so result columns
@@ -337,7 +365,7 @@ class TestRawl(object):
         # Test that there is the same amount of columns as provided to the model
         assert len(result) == len(mod.columns)
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_get_with_string_pk(self, pgdb):
         """ 
         Test case that covers if a string is given as pk to get()
@@ -351,7 +379,7 @@ class TestRawl(object):
 
         assert type(result) == RawlResult
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_single_line_call(self, pgdb):
         """ 
         Test single line calls where the model is instantiated and a method is 
@@ -364,7 +392,7 @@ class TestRawl(object):
 
         assert type(result) == RawlResult
 
-    @pytest.mark.dependency(depends=['test_all', 'test_get_single_rawl'])
+    @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_dict_assignment(self, pgdb):
         """ 
         This test tries to assign something to RawlResult as if it were a dict

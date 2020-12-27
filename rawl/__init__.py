@@ -56,7 +56,6 @@ License:
 import logging
 import random
 import warnings
-import decimal
 from enum import IntEnum
 from abc import ABC
 from json import JSONEncoder
@@ -81,8 +80,8 @@ class RawlException(Exception): pass
 
 
 class RawlConnection(object):
-    """ 
-    Connection handling for rawl 
+    """
+    Connection handling for rawl
 
     Usage
     -----
@@ -92,11 +91,12 @@ class RawlConnection(object):
         results = cursor.fetchall()
     """
 
-    def __init__(self, dsn_string):
+    def __init__(self, dsn_string, close_on_exit=True):
 
         log.debug("Connection init")
 
         self.dsn = dsn_string
+        self.close_on_exit = close_on_exit
 
         # Create the pool if it doesn't exist already
         global _POOL
@@ -106,8 +106,7 @@ class RawlConnection(object):
         self.conn = None
 
     def __enter__(self):
-        try: 
-            
+        try:
             log.info("Connecting to %s" % self.dsn)
 
             self.conn = _POOL.getconn()
@@ -118,11 +117,12 @@ class RawlConnection(object):
         except Exception:
             log.exception("Connection failure")
 
-        finally: 
+        finally:
             # Assume rolled back if uncommitted
-            if self.conn.status in OPEN_TRANSACTION_STATES:
-                self.conn.rollback()
-            _POOL.putconn(self.conn)
+            if self.close_on_exit:
+                if self.conn.status in OPEN_TRANSACTION_STATES:
+                    self.conn.rollback()
+                _POOL.putconn(self.conn)
             self.conn = None
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -148,7 +148,7 @@ class RawlResult(object):
 
         # Then resort to the data dict
         except AttributeError:
-            
+
             if name in self._data:
                 return self._data[name]
             else:
@@ -198,7 +198,6 @@ class RawlResult(object):
         return len(self._data)
 
     def __iter__(self):
-        #log.debug(self.data)
         things = self._data.values()
         for x in things:
             yield x
@@ -223,10 +222,11 @@ class RawlBase(ABC):
         self.dsn = dsn
         self.table = table_name
         self.columns = []
+        self._open_conn = None
 
         # Process the provided columns into a list
         self.process_columns(columns)
-        
+
         # Use primary key provided
         if pk_name is not None:
             self.pk = pk_name
@@ -235,8 +235,8 @@ class RawlBase(ABC):
             self.pk = columns[0]
 
     def _assemble_with_columns(self, sql_str, columns, *args, **kwargs):
-        """ 
-        Format a select statement with specific columns 
+        """
+        Format a select statement with specific columns
 
         :sql_str:   An SQL string template
         :columns:   The columns to be selected and put into {0}
@@ -256,30 +256,29 @@ class RawlBase(ABC):
             else:
                 qcols.append(sql.Identifier(col))
 
-        # sql.SQL(', ').join([sql.Identifier(x) for x in columns]),
-        
         query_string = sql.SQL(sql_str).format(
             sql.SQL(', ').join(qcols),
             *[sql.Literal(a) for a in args]
             )
-        
+
         return query_string
 
     def _assemble_select(self, sql_str, columns, *args, **kwargs):
         """ Alias for _assemble_with_columns
         """
-        warnings.warn("_assemble_select has been depreciated for _assemble_with_columns. It will be removed in a future version.", DeprecationWarning)
+        warnings.warn("_assemble_select has been depreciated for _assemble_with_columns. It will be"
+                      " removed in a future version.", DeprecationWarning)
         return self._assemble_with_columns(sql_str, columns, *args, **kwargs)
 
     def _assemble_simple(self, sql_str, *args, **kwargs):
-        """ 
-        Format a select statement with specific columns 
+        """
+        Format a select statement with specific columns
 
         :sql_str:   An SQL string template
         :*args:     Arguments to use as query parameters.
         :returns:   Psycopg2 compiled query
         """
-        
+
         query_string = sql.SQL(sql_str).format(
             *[sql.Literal(a) for a in args]
             )
@@ -287,8 +286,8 @@ class RawlBase(ABC):
         return query_string
 
     def _execute(self, query, commit=False, working_columns=None):
-        """ 
-        Execute a query with provided parameters 
+        """
+        Execute a query with provided parameters
 
         Parameters
         :query:     SQL string with parameter placeholders
@@ -303,7 +302,16 @@ class RawlBase(ABC):
         if working_columns is None:
             working_columns = self.columns
 
-        with RawlConnection(self.dsn) as conn:
+        with RawlConnection(self.dsn) as given_conn:
+
+            # Handle open sessions
+            conn = None
+            if self._open_conn:
+                conn = self._open_conn
+            else:
+                conn = given_conn
+                if commit is not True:
+                    self._open_conn = conn
 
             query_id = random.randrange(9999)
 
@@ -311,49 +319,48 @@ class RawlBase(ABC):
 
             try:
                 log.debug("Executing(%s): %s" % (query_id, query.as_string(curs)))
-            except:
+            except Exception:
                 log.exception("LOGGING EXCEPTION LOL")
 
             curs.execute(query)
 
             log.debug("Executed")
 
-            if commit == True:
+            if commit is True:
                 log.debug("COMMIT(%s)" % query_id)
                 conn.commit()
-            
+
             log.debug("curs.rowcount: %s" % curs.rowcount)
-            
+
             if curs.rowcount > 0:
-                #result = curs.fetchall()
                 # Process the results into a dict and stuff it in a RawlResult
                 # object.  Then append that object to result
                 result_rows = curs.fetchall()
                 for row in result_rows:
-                    
+
                     i = 0
                     row_dict = {}
                     for col in working_columns:
                         try:
-                            #log.debug("row_dict[%s] = row[%s] which is %s" % (col, i, row[i]))
                             # For aliased columns, we need to get rid of the dot
                             col = col.replace('.', '_')
                             row_dict[col] = row[i]
-                        except IndexError: pass
+                        except IndexError:
+                            pass
                         i += 1
-                    
+
                     log.debug("Appending dict to result: %s" % row_dict)
-                    
+
                     rr = RawlResult(working_columns, row_dict)
                     result.append(rr)
-            
+
             curs.close()
 
         return result
 
     def process_columns(self, columns):
-        """ 
-        Handle provided columns and if necessary, convert columns to a list for 
+        """
+        Handle provided columns and if necessary, convert columns to a list for
         internal strage.
 
         :columns: A sequence of columns for the table. Can be list, comma
@@ -369,8 +376,8 @@ class RawlBase(ABC):
             raise RawlException("Unknown format for columns")
 
     def query(self, sql_string, *args, **kwargs):
-        """ 
-        Execute a DML query 
+        """
+        Execute a DML query
 
         :sql_string:    An SQL string template
         :*args:         Arguments to be passed for query parameters.
@@ -387,8 +394,8 @@ class RawlBase(ABC):
         return self._execute(query, commit=commit, working_columns=columns)
 
     def select(self, sql_string, cols, *args, **kwargs):
-        """ 
-        Execute a SELECT statement 
+        """
+        Execute a SELECT statement
 
         :sql_string:    An SQL string template
         :columns:       A list of columns to be returned by the query
@@ -398,14 +405,14 @@ class RawlBase(ABC):
         working_columns = None
         if kwargs.get('columns') is not None:
             working_columns = kwargs.pop('columns')
-        query = self._assemble_select(sql_string, cols, *args, *kwargs)
+        query = self._assemble_with_columns(sql_string, cols, *args, *kwargs)
         return self._execute(query, working_columns=working_columns)
 
     def insert_dict(self, value_dict, commit=False):
-        """ 
+        """
         Execute an INSERT statement using a python dict
 
-        :value_dict:    A dictionary representing all the columns(keys) and 
+        :value_dict:    A dictionary representing all the columns(keys) and
             values that should be part of the INSERT statement
         :commit:        Whether to automatically commit the transaction
         :returns:       Psycopg2 result
@@ -424,18 +431,17 @@ class RawlBase(ABC):
         # dict.  If available, we need to add it to our col/val sets
         for col in self.columns:
             if col in value_dict:
-                #log.debug("Inserting with column %s" % col)
                 insert_cols.append(col)
                 value_set.append(value_dict[col])
 
         # Create SQL statement placeholders for the dynamic values
         placeholders = ', '.join(["{%s}" % x for x in range(1, len(value_set) + 1)])
 
-        # TODO: Maybe don't trust table_name ane pk_name?  Shouldn't really be 
+        # TODO: Maybe don't trust table_name ane pk_name?  Shouldn't really be
         # user input, but who knows.
         query = self._assemble_with_columns('''
-            INSERT INTO "''' + self.table + '''" ({0}) 
-            VALUES (''' + placeholders + ''') 
+            INSERT INTO "''' + self.table + '''" ({0})
+            VALUES (''' + placeholders + ''')
             RETURNING ''' + self.pk + '''
             ''', insert_cols, *value_set)
 
@@ -453,7 +459,7 @@ class RawlBase(ABC):
             return None
 
     def get(self, pk):
-        """ 
+        """
         Retreive a single record from the table.  Lots of reasons this might be
         best implemented in the model
 
@@ -465,24 +471,34 @@ class RawlBase(ABC):
             # Probably an int, give it a shot
             try:
                 pk = int(pk)
-            except ValueError: pass
+            except ValueError:
+                pass
 
         return self.select(
             "SELECT {0} FROM " + self.table + " WHERE " + self.pk + " = {1};",
             self.columns, pk)
 
     def all(self):
-        """ 
+        """
         Retreive all single record from the table.  Should be implemented but not
         required.
         :returns:       List of results
         """
 
-        return self.select("SELECT {0} FROM " + self.table + ";", 
-            self.columns)
+        return self.select("SELECT {0} FROM " + self.table + ";",
+                           self.columns)
+
+    def commit(self):
+        """
+        Commit an already open transaction
+        TODO: Deal with open tx states
+        """
+        with RawlConnection(self.dsn) as conn:
+            conn.commit()
+
 
 class RawlJSONEncoder(JSONEncoder):
-    """ 
+    """
     A JSON encoder that can be used with json.dumps
 
     Usage
