@@ -93,6 +93,17 @@ they were `dict`s, `object`s, or `list`s.  For instance:
 `RawResult` should be suitable for serialization(pickling), but should you need 
 to convert to a python type, use `RawResult.to_dict()` or `RawResult.to_list()`.
 
+### Transactions
+
+There's some rudimentary support for transactions within models as well.  You
+can start a transaction by calling `start_transaction()` on the model and
+finalize the transaction either by calling `rollback()` or `commit()`.
+
+    model = StateModel(DSN)
+    model.start_transaction()
+    model.insert_dict({"state_id": "PA", "name": "Pennsylvania"})
+    model.commit()
+
 ### JSON Encoding
 
 In case you want to convert your query results directly to a JSON string for 
