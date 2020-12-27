@@ -1,8 +1,8 @@
 name: lint
 on: push
 jobs:
-  flake8:
-    name: Lint (flake8)
+  black:
+    name: Lint (black)
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -26,5 +26,5 @@ jobs:
             pip install -e .
           fi
 
-      - name: Lint with flake8
-        run: flake8 .
+      - name: Lint with black
+        run: black --check .
