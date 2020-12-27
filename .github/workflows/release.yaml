@@ -1,11 +1,11 @@
-name: lint
+name: release
 on:
   push:
     branches: master
   tags:
     - v*
 jobs:
-  build-n-publish:
+  release:
     name: Publish to PyPi
     runs-on: ubuntu-latest
     steps:
