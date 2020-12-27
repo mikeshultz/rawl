@@ -8,6 +8,7 @@ jobs:
       postgres:
         image: postgres
         env:
+          POSTGRES_USER: rawl
           POSTGRES_PASSWORD: s3cretpass
         options: >-
           --health-cmd pg_isready
@@ -39,5 +40,5 @@ jobs:
       - name: Run pytest
         run: pytest
         env:
-          PG_DSN: postgresql://rawl:s3cretpass@postgres/postgres
-          RAWL_DSN: postgresql://rawl:s3cretpass@postgres/rawl_test
+          PG_DSN: postgresql://rawl:s3cretpass@localhost/postgres
+          RAWL_DSN: postgresql://rawl:s3cretpass@localhost/rawl_test
