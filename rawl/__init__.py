@@ -56,6 +56,7 @@ License:
 import logging
 import random
 import warnings
+import decimal
 from enum import IntEnum
 from abc import ABC
 from json import JSONEncoder
@@ -71,10 +72,11 @@ from psycopg2.extensions import (
 
 OPEN_TRANSACTION_STATES = (STATUS_IN_TRANSACTION, STATUS_BEGIN, STATUS_PREPARED)
 
-log = logging.getLogger('rawl')
+log = logging.getLogger("rawl")
 
 
-class RawlException(Exception): pass
+class RawlException(Exception):
+    pass
 
 
 class RawlConnection(object):
@@ -88,6 +90,7 @@ class RawlConnection(object):
         cursor.execute("SELECT * from my_table;")
         results = cursor.fetchall()
     """
+
     pool = None
 
     def __init__(self, dsn_string, close_on_exit=True):
@@ -100,21 +103,29 @@ class RawlConnection(object):
         # Create the pool if it doesn't exist already
         if RawlConnection.pool is None:
             RawlConnection.pool = ThreadedConnectionPool(1, 25, self.dsn)
-            log.debug('Created connection pool ({})'.format(id(RawlConnection.pool)))
+            log.debug("Created connection pool ({})".format(id(RawlConnection.pool)))
         else:
-            log.debug('Reusing connection pool ({})'.format(id(RawlConnection.pool)))
+            log.debug("Reusing connection pool ({})".format(id(RawlConnection.pool)))
 
     def __enter__(self):
-        conn = None
         try:
-            conn = self.get_conn()
-            return conn
+
+            log.info("Connecting to %s" % self.dsn)
+
+            self.conn = _POOL.getconn()
+            if self.conn.status not in OPEN_TRANSACTION_STATES:
+                self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
+            return self.conn
 
         except Exception:
             log.exception("Connection failure")
 
         finally:
-            self.put_conn(conn)
+            # Assume rolled back if uncommitted
+            if self.conn.status in OPEN_TRANSACTION_STATES:
+                self.conn.rollback()
+            _POOL.putconn(self.conn)
+            self.conn = None
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val:
@@ -205,6 +216,7 @@ class RawlResult(object):
         return len(self._data)
 
     def __iter__(self):
+        # log.debug(self.data)
         things = self._data.values()
         for x in things:
             yield x
@@ -255,27 +267,29 @@ class RawlBase(ABC):
         # Handle any aliased columns we get (e.g. table_alias.column)
         qcols = []
         for col in columns:
-            if '.' in col:
+            if "." in col:
                 # Explodeded it
-                wlist = col.split('.')
+                wlist = col.split(".")
 
                 # Reassemble into string and drop it into the list
-                qcols.append(sql.SQL('.').join([sql.Identifier(x) for x in wlist]))
+                qcols.append(sql.SQL(".").join([sql.Identifier(x) for x in wlist]))
             else:
                 qcols.append(sql.Identifier(col))
 
+        # sql.SQL(', ').join([sql.Identifier(x) for x in columns]),
+
         query_string = sql.SQL(sql_str).format(
-            sql.SQL(', ').join(qcols),
-            *[sql.Literal(a) for a in args]
-            )
+            sql.SQL(", ").join(qcols), *[sql.Literal(a) for a in args]
+        )
 
         return query_string
 
     def _assemble_select(self, sql_str, columns, *args, **kwargs):
-        """ Alias for _assemble_with_columns
-        """
-        warnings.warn("_assemble_select has been depreciated for _assemble_with_columns. It will be"
-                      " removed in a future version.", DeprecationWarning)
+        """Alias for _assemble_with_columns"""
+        warnings.warn(
+            "_assemble_select has been depreciated for _assemble_with_columns. It will be removed in a future version.",
+            DeprecationWarning,
+        )
         return self._assemble_with_columns(sql_str, columns, *args, **kwargs)
 
     def _assemble_simple(self, sql_str, *args, **kwargs):
@@ -287,9 +301,7 @@ class RawlBase(ABC):
         :returns:   Psycopg2 compiled query
         """
 
-        query_string = sql.SQL(sql_str).format(
-            *[sql.Literal(a) for a in args]
-            )
+        query_string = sql.SQL(sql_str).format(*[sql.Literal(a) for a in args])
 
         return query_string
 
@@ -349,13 +361,13 @@ class RawlBase(ABC):
         if curs.rowcount > 0 and curs.description is not None:
             # Process the results into a dict and stuff it in a RawlResult
             # object.  Then append that object to result
-            #result_rows = curs.fetchall()
+            # result_rows = curs.fetchall()
             for row in curs.fetchall():
                 row_dict = {}
                 for i, col in enumerate(working_columns):
                     try:
                         # For aliased columns, we need to get rid of the dot
-                        col = col.replace('.', '_')
+                        col = col.replace(".", "_")
                         row_dict[col] = row[i]
                     except IndexError:
                         pass
@@ -398,10 +410,10 @@ class RawlBase(ABC):
         """
         commit = None
         columns = None
-        if kwargs.get('commit') is not None:
-            commit = kwargs.pop('commit')
-        if kwargs.get('columns') is not None:
-            columns = kwargs.pop('columns')
+        if kwargs.get("commit") is not None:
+            commit = kwargs.pop("commit")
+        if kwargs.get("columns") is not None:
+            columns = kwargs.pop("columns")
         query = self._assemble_simple(sql_string, *args, **kwargs)
         return self._execute(query, commit=commit, working_columns=columns)
 
@@ -415,8 +427,8 @@ class RawlBase(ABC):
         :returns:       Psycopg2 result
         """
         working_columns = None
-        if kwargs.get('columns') is not None:
-            working_columns = kwargs.pop('columns')
+        if kwargs.get("columns") is not None:
+            working_columns = kwargs.pop("columns")
         query = self._assemble_with_columns(sql_string, cols, *args, *kwargs)
         return self._execute(query, working_columns=working_columns)
 
@@ -443,19 +455,30 @@ class RawlBase(ABC):
         # dict.  If available, we need to add it to our col/val sets
         for col in self.columns:
             if col in value_dict:
+                # log.debug("Inserting with column %s" % col)
                 insert_cols.append(col)
                 value_set.append(value_dict[col])
 
         # Create SQL statement placeholders for the dynamic values
-        placeholders = ', '.join(["{%s}" % x for x in range(1, len(value_set) + 1)])
+        placeholders = ", ".join(["{%s}" % x for x in range(1, len(value_set) + 1)])
 
         # TODO: Maybe don't trust table_name ane pk_name?  Shouldn't really be
         # user input, but who knows.
-        query = self._assemble_with_columns('''
-            INSERT INTO "''' + self.table + '''" ({0})
-            VALUES (''' + placeholders + ''')
-            RETURNING ''' + self.pk + '''
-            ''', insert_cols, *value_set)
+        query = self._assemble_with_columns(
+            '''
+            INSERT INTO "'''
+            + self.table
+            + """" ({0}) 
+            VALUES ("""
+            + placeholders
+            + """) 
+            RETURNING """
+            + self.pk
+            + """
+            """,
+            insert_cols,
+            *value_set
+        )
 
         result = self._execute(query, commit=commit)
 
@@ -488,7 +511,9 @@ class RawlBase(ABC):
 
         return self.select(
             "SELECT {0} FROM " + self.table + " WHERE " + self.pk + " = {1};",
-            self.columns, pk)
+            self.columns,
+            pk,
+        )
 
     def all(self):
         """
@@ -497,8 +522,7 @@ class RawlBase(ABC):
         :returns:       List of results
         """
 
-        return self.select("SELECT {0} FROM " + self.table + ";",
-                           self.columns)
+        return self.select("SELECT {0} FROM " + self.table + ";", self.columns)
 
     def start_transaction(self):
         """
@@ -512,7 +536,7 @@ class RawlBase(ABC):
         Initiate a connection  to use as a transaction
         """
         if self._open_transaction:
-            log.debug('rollback()')
+            log.debug("rollback()")
             if self._open_cursor:
                 self._open_cursor.close()
             self._open_transaction.rollback()
@@ -525,7 +549,7 @@ class RawlBase(ABC):
         Commit an already open transaction
         """
         if self._open_transaction:
-            log.debug('commit()')
+            log.debug("commit()")
             if self._open_cursor:
                 self._open_cursor.close()
             self._open_transaction.commit()
@@ -542,6 +566,7 @@ class RawlJSONEncoder(JSONEncoder):
     -----
     json.dumps(cls=RawlJSONEncoder)
     """
+
     def default(self, o):
         if type(o) == datetime:
             return o.isoformat()
