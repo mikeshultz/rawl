@@ -40,5 +40,5 @@ jobs:
       - name: Run pytest
         run: pytest
         env:
-          PG_DSN: postgresql://rawl:s3cretpass@localhost/postgres
-          RAWL_DSN: postgresql://rawl:s3cretpass@localhost/rawl_test
+          PG_DSN: postgresql://rawl:s3cretpass@postgres:5432/postgres
+          RAWL_DSN: postgresql://rawl:s3cretpass@postgres:5432/rawl_test
