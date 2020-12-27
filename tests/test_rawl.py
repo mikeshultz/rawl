@@ -6,7 +6,7 @@ import json
 from enum import IntEnum
 from psycopg2 import connect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from rawl import RawlBase, RawlConnection, RawlException, RawlResult, RawlJSONEncoder
+from rawl import RawlBase, RawlResult, RawlJSONEncoder
 
 log = logging.getLogger(__name__)
 
@@ -238,7 +238,7 @@ class TestRawl(object):
         mod = TheModel(RAWL_DSN)
 
         try:
-            new_row_id = mod.insert_dict({"not_a_column": "foobar"}, commit=False)
+            mod.insert_dict({"not_a_column": "foobar"}, commit=False)
             assert False
         except ValueError:
             assert True
@@ -276,8 +276,6 @@ class TestRawl(object):
         """
         Test that a RawlResult object can be serialized properly.
         """
-
-        RAWL_ID = 1
 
         mod = TheModel(RAWL_DSN)
 
