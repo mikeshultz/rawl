@@ -1,9 +1,10 @@
 name: release
+
 on:
   push:
     branches: master
-  tags:
-    - v*
+    tags: ['v*']
+
 jobs:
   release:
     name: Publish to PyPi
