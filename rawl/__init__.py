@@ -399,7 +399,7 @@ class RawlBase(ABC):
         working_columns = None
         if kwargs.get("columns") is not None:
             working_columns = kwargs.pop("columns")
-        query = self._assemble_select(sql_string, cols, *args, *kwargs)
+        query = self._assemble_with_columns(sql_string, cols, *args, *kwargs)
         return self._execute(query, working_columns=working_columns)
 
     def insert_dict(self, value_dict, commit=False):
