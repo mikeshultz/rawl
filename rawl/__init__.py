@@ -108,24 +108,17 @@ class RawlConnection(object):
             log.debug("Reusing connection pool ({})".format(id(RawlConnection.pool)))
 
     def __enter__(self):
+        conn = None
+
         try:
-
-            log.info("Connecting to %s" % self.dsn)
-
-            self.conn = _POOL.getconn()
-            if self.conn.status not in OPEN_TRANSACTION_STATES:
-                self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
-            return self.conn
+            conn = self.get_conn()  
+            return conn
 
         except Exception:
             log.exception("Connection failure")
 
         finally:
-            # Assume rolled back if uncommitted
-            if self.conn.status in OPEN_TRANSACTION_STATES:
-                self.conn.rollback()
-            _POOL.putconn(self.conn)
-            self.conn = None
+            self.put_conn(conn)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val:
@@ -216,7 +209,6 @@ class RawlResult(object):
         return len(self._data)
 
     def __iter__(self):
-        # log.debug(self.data)
         things = self._data.values()
         for x in things:
             yield x
@@ -275,8 +267,6 @@ class RawlBase(ABC):
                 qcols.append(sql.SQL(".").join([sql.Identifier(x) for x in wlist]))
             else:
                 qcols.append(sql.Identifier(col))
-
-        # sql.SQL(', ').join([sql.Identifier(x) for x in columns]),
 
         query_string = sql.SQL(sql_str).format(
             sql.SQL(", ").join(qcols), *[sql.Literal(a) for a in args]
@@ -361,7 +351,6 @@ class RawlBase(ABC):
         if curs.rowcount > 0 and curs.description is not None:
             # Process the results into a dict and stuff it in a RawlResult
             # object.  Then append that object to result
-            # result_rows = curs.fetchall()
             for row in curs.fetchall():
                 row_dict = {}
                 for i, col in enumerate(working_columns):

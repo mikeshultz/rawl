@@ -87,7 +87,7 @@ class TheModel(RawlBase):
         """Test out self.query directly using columns"""
 
         res = self.query(
-            "SELECT *" " FROM rawl" " WHERE rawl_id={0}", rawl_id, columns=self.columns
+            "SELECT * FROM rawl WHERE rawl_id={0}", rawl_id, columns=self.columns
         )
 
         if len(res) > 0:
