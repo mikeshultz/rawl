@@ -1,10 +1,13 @@
 name: test
 on: push
 jobs:
-  pytest-3.9:
+  pytest:
     name: Test (pytest)
+    strategy:
+      matrix:
+        python-version: ["3.6", 3.7", "3.8", "3.9"]
     runs-on: ubuntu-latest
-    container: python:3.9
+    container: python:${{ matrix.python-version }}
     services:
       postgres:
         image: postgres
