@@ -66,14 +66,12 @@ from psycopg2.extensions import (
     STATUS_IN_TRANSACTION,
     STATUS_BEGIN,
     STATUS_PREPARED,
-    ISOLATION_LEVEL_READ_COMMITTED
+    ISOLATION_LEVEL_READ_COMMITTED,
 )
 
 OPEN_TRANSACTION_STATES = (STATUS_IN_TRANSACTION, STATUS_BEGIN, STATUS_PREPARED)
 
 log = logging.getLogger('rawl')
-
-_POOL = None
 
 
 class RawlException(Exception): pass
@@ -90,6 +88,7 @@ class RawlConnection(object):
         cursor.execute("SELECT * from my_table;")
         results = cursor.fetchall()
     """
+    pool = None
 
     def __init__(self, dsn_string, close_on_exit=True):
 
@@ -99,36 +98,44 @@ class RawlConnection(object):
         self.close_on_exit = close_on_exit
 
         # Create the pool if it doesn't exist already
-        global _POOL
-        if _POOL is None:
-            _POOL = ThreadedConnectionPool(1, 25, self.dsn)
-
-        self.conn = None
+        if RawlConnection.pool is None:
+            RawlConnection.pool = ThreadedConnectionPool(1, 25, self.dsn)
+            log.debug('Created connection pool ({})'.format(id(RawlConnection.pool)))
+        else:
+            log.debug('Reusing connection pool ({})'.format(id(RawlConnection.pool)))
 
     def __enter__(self):
+        conn = None
         try:
-            log.info("Connecting to %s" % self.dsn)
-
-            self.conn = _POOL.getconn()
-            if self.conn.status not in OPEN_TRANSACTION_STATES:
-                self.conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
-            return self.conn
+            conn = self.get_conn()
+            return conn
 
         except Exception:
             log.exception("Connection failure")
 
         finally:
-            # Assume rolled back if uncommitted
-            if self.close_on_exit:
-                if self.conn.status in OPEN_TRANSACTION_STATES:
-                    self.conn.rollback()
-                _POOL.putconn(self.conn)
-            self.conn = None
+            self.put_conn(conn)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val:
             self.entrance = False
         return True
+
+    def get_conn(self):
+        log.info("Connecting to %s" % self.dsn)
+
+        conn = RawlConnection.pool.getconn()
+        if conn.status not in OPEN_TRANSACTION_STATES:
+            conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
+        return conn
+
+    def put_conn(self, conn):
+        if self.close_on_exit:
+            # Assume rolled back if uncommitted
+            if conn.status in OPEN_TRANSACTION_STATES:
+                conn.rollback()
+
+            RawlConnection.pool.putconn(conn)
 
 
 class RawlResult(object):
@@ -222,7 +229,8 @@ class RawlBase(ABC):
         self.dsn = dsn
         self.table = table_name
         self.columns = []
-        self._open_conn = None
+        self._open_transaction = None
+        self._open_cursor = None
 
         # Process the provided columns into a list
         self.process_columns(columns)
@@ -302,58 +310,62 @@ class RawlBase(ABC):
         if working_columns is None:
             working_columns = self.columns
 
-        with RawlConnection(self.dsn) as given_conn:
+        conn = None
+        if self._open_transaction:
+            conn = self._open_transaction
+        else:
+            conn = RawlConnection(self.dsn).get_conn()
 
-            # Handle open sessions
-            conn = None
-            if self._open_conn:
-                conn = self._open_conn
-            else:
-                conn = given_conn
-                if not commit:
-                    self._open_conn = conn
+        query_id = random.randrange(9999)
 
-            query_id = random.randrange(9999)
-
+        curs = None
+        if self._open_transaction:
+            if not self._open_cursor:
+                self._open_cursor = conn.cursor()
+            curs = self._open_cursor
+        else:
             curs = conn.cursor()
 
-            try:
-                log.debug("Executing(%s): %s" % (query_id, query.as_string(curs)))
-            except Exception:
-                log.exception("LOGGING EXCEPTION LOL")
+        try:
+            log.debug("Executing(%s): %s" % (query_id, query.as_string(curs)))
+        except Exception:
+            log.exception("LOGGING EXCEPTION LOL")
 
-            curs.execute(query)
+        curs.execute(query)
 
-            log.debug("Executed")
+        log.debug("Executed")
 
-            if commit:
-                log.debug("COMMIT(%s)" % query_id)
-                conn.commit()
+        if commit:
+            log.debug("AUTOCOMMIT(%s)" % query_id)
+            conn.commit()
 
-            log.debug("curs.rowcount: %s" % curs.rowcount)
+        log.debug("curs.rowcount: %s" % curs.rowcount)
 
-            if curs.rowcount > 0:
-                # Process the results into a dict and stuff it in a RawlResult
-                # object.  Then append that object to result
-                result_rows = curs.fetchall()
-                for row in result_rows:
+        """ According to the docs, curs.description "is None for operations
+        that do not return rows"
 
-                    i = 0
-                    row_dict = {}
-                    for col in working_columns:
-                        try:
-                            # For aliased columns, we need to get rid of the dot
-                            col = col.replace('.', '_')
-                            row_dict[col] = row[i]
-                        except IndexError:
-                            pass
-                        i += 1
+        https://www.psycopg.org/docs/cursor.html#cursor.description
+        """
+        if curs.rowcount > 0 and curs.description is not None:
+            # Process the results into a dict and stuff it in a RawlResult
+            # object.  Then append that object to result
+            #result_rows = curs.fetchall()
+            for row in curs.fetchall():
+                row_dict = {}
+                for i, col in enumerate(working_columns):
+                    try:
+                        # For aliased columns, we need to get rid of the dot
+                        col = col.replace('.', '_')
+                        row_dict[col] = row[i]
+                    except IndexError:
+                        pass
 
-                    log.debug("Appending dict to result: %s" % row_dict)
+                log.debug("Appending dict to result: %s" % row_dict)
 
-                    rr = RawlResult(working_columns, row_dict)
-                    result.append(rr)
+                rr = RawlResult(working_columns, row_dict)
+                result.append(rr)
 
+        if not self._open_cursor:
             curs.close()
 
         return result
@@ -488,13 +500,38 @@ class RawlBase(ABC):
         return self.select("SELECT {0} FROM " + self.table + ";",
                            self.columns)
 
+    def start_transaction(self):
+        """
+        Initiate a connection  to use as a transaction
+        """
+        self._open_transaction = RawlConnection(self.dsn).get_conn()
+        return self._open_transaction
+
+    def rollback(self):
+        """
+        Initiate a connection  to use as a transaction
+        """
+        if self._open_transaction:
+            log.debug('rollback()')
+            if self._open_cursor:
+                self._open_cursor.close()
+            self._open_transaction.rollback()
+            self._open_transaction = None
+        else:
+            log.warning("Cannot rollback, no open transaction")
+
     def commit(self):
         """
         Commit an already open transaction
-        TODO: Deal with open tx states
         """
-        with RawlConnection(self.dsn, close_on_exit=True) as conn:
-            conn.commit()
+        if self._open_transaction:
+            log.debug('commit()')
+            if self._open_cursor:
+                self._open_cursor.close()
+            self._open_transaction.commit()
+            self._open_transaction = None
+        else:
+            log.warning("Cannot commit, no open transaction")
 
 
 class RawlJSONEncoder(JSONEncoder):

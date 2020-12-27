@@ -94,10 +94,8 @@ class TheModel(RawlBase):
         """
 
         res = self.query(
-            "SELECT *"
-            " FROM rawl"
-            " WHERE rawl_id={0}", 
-            rawl_id, columns=self.columns)
+            "SELECT * FROM rawl WHERE rawl_id={0}", rawl_id,
+            columns=self.columns)
 
         if len(res) > 0:
             return res[0]
@@ -112,7 +110,13 @@ class TheModel(RawlBase):
     def delete_rawl_without_commit(self, rawl_id):
         """ Test a delete """
 
-        return self.query("DELETE FROM rawl WHERE rawl_id={0};", rawl_id, commit=False)
+        self.start_transaction()
+
+        result = self.query("DELETE FROM rawl WHERE rawl_id={0};", rawl_id, commit=False)
+
+        self.rollback()
+
+        return result
 
 
 class TestRawl(object):
@@ -246,30 +250,52 @@ class TestRawl(object):
         """
 
         mod = TheModel(RAWL_DSN)
+        other_mod = TheModel(RAWL_DSN)
+
+        mod.start_transaction()
+        conn_id = id(mod._open_transaction)
 
         orig_result = mod.all()
 
-        assert mod._open_conn is not None
+        assert mod._open_transaction is not None
 
         new_row_id = mod.insert_dict({'name': "Row six of sticks!"}, commit=False)
-        new_result = mod.all()
+        uncommitted_new_result = mod.all()
+        new_result = other_mod.all()
+
+        assert conn_id == id(mod._open_transaction)
 
         # Test that standard RETURNING is working
         assert new_row_id == 6
+        assert len(new_result) == len(orig_result)
+        assert len(uncommitted_new_result) == len(orig_result) + 1
 
         # Make sure the new one is in the results from all()
         assert len(new_result) == len(orig_result)
 
         newer_row_id = mod.insert_dict({'name': "Row seven is not eleven"}, commit=False)
-        newer_result = mod.all()
+        uncommitted_newer_result = mod.all()
+        newer_result = other_mod.all()
+
+        assert conn_id == id(mod._open_transaction)
+
         assert newer_row_id == 7
         assert len(newer_result) == len(orig_result)
+        assert len(uncommitted_newer_result) == len(orig_result) + 2
 
         mod.commit()
+
+        assert mod._open_transaction is None
+
+        assert conn_id != id(mod._open_transaction)
 
         newest_result = mod.all()
 
         assert len(newest_result) - len(orig_result) == 2
+
+        mod.rollback()
+
+        assert mod._open_transaction is None
 
     @pytest.mark.dependency(depends=['TestRawl::test_all', 'TestRawl::test_get_single_rawl'])
     def test_insert_dict_with_invalid_column(self, pgdb):
