@@ -70,6 +70,8 @@ from psycopg2.extensions import (
 )
 
 OPEN_TRANSACTION_STATES = (STATUS_IN_TRANSACTION, STATUS_BEGIN, STATUS_PREPARED)
+POOL_MIN_CONN = 1
+POOL_MAX_CONN = 25
 
 log = logging.getLogger("rawl")
 
@@ -101,7 +103,7 @@ class RawlConnection(object):
 
         # Create the pool if it doesn't exist already
         if RawlConnection.pool is None:
-            RawlConnection.pool = ThreadedConnectionPool(1, 25, self.dsn)
+            RawlConnection.pool = ThreadedConnectionPool(POOL_MIN_CONN, POOL_MAX_CONN, self.dsn)
             log.debug("Created connection pool ({})".format(id(RawlConnection.pool)))
         else:
             log.debug("Reusing connection pool ({})".format(id(RawlConnection.pool)))
@@ -232,6 +234,7 @@ class RawlBase(ABC):
         self.dsn = dsn
         self.table = table_name
         self.columns = []
+        self._connection_manager = RawlConnection(dsn)
         self._open_transaction = None
         self._open_cursor = None
 
@@ -315,7 +318,7 @@ class RawlBase(ABC):
         if self._open_transaction:
             conn = self._open_transaction
         else:
-            conn = RawlConnection(self.dsn).get_conn()
+            conn = self._connection_manager.get_conn()
 
         query_id = random.randrange(9999)
 
@@ -367,6 +370,9 @@ class RawlBase(ABC):
 
         if not self._open_cursor:
             curs.close()
+
+        if not self._open_transaction:
+            self._connection_manager.put_conn(conn)
 
         return result
 
@@ -516,7 +522,7 @@ class RawlBase(ABC):
         """
         Initiate a connection  to use as a transaction
         """
-        self._open_transaction = RawlConnection(self.dsn).get_conn()
+        self._open_transaction = self._connection_manager.get_conn()
         return self._open_transaction
 
     def rollback(self):

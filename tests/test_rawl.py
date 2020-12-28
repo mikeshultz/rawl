@@ -6,7 +6,7 @@ import json
 from enum import IntEnum
 from psycopg2 import connect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from rawl import RawlBase, RawlResult, RawlJSONEncoder
+from rawl import POOL_MAX_CONN, RawlBase, RawlResult, RawlJSONEncoder
 
 log = logging.getLogger(__name__)
 
@@ -459,3 +459,22 @@ class TestRawl(object):
         result[0]["name"] = NAME
 
         assert result[0].name == NAME
+
+    @pytest.mark.dependency(
+        depends=[
+            "TestRawl::test_insert_dict",
+            "TestRawl::test_insert_dict_without_commit",
+            "TestRawl::test_insert_dict_with_invalid_column",
+        ]
+    )
+    def test_many_insert(self, pgdb):
+        """
+        Test more inserts than POOL_MAX_CONN.  Tests against "connection pool
+        exhausted" errors
+        """
+
+        mod = TheModel(RAWL_DSN)
+
+        for i in range(0, POOL_MAX_CONN*2):
+            x = mod.insert_dict({"name": "Row seven is not eleven"}, commit=True)
+            assert x > 0
