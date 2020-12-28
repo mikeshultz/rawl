@@ -44,8 +44,8 @@ jobs:
             pip install -e .
           fi
 
-      # - name: Install coveralls
-      #   run: pip install coveralls
+      - name: Install coveralls
+        run: pip install coveralls
 
       - name: Run Coverage
         run: coverage run --source rawl -m py.test
