@@ -1,5 +1,8 @@
 # Rawl
-[![Build Status](https://travis-ci.org/mikeshultz/rawl.svg?branch=master)](https://travis-ci.org/mikeshultz/rawl) [![Coverage Status](https://coveralls.io/repos/github/mikeshultz/rawl/badge.svg?branch=master)](https://coveralls.io/github/mikeshultz/rawl?branch=master)
+[![Lint](https://github.com/mikeshultz/rawl/workflows/lint/badge.svg)](https://github.com/mikeshultz/rawl/actions)
+[![Tests](https://github.com/mikeshultz/rawl/workflows/test/badge.svg)](https://github.com/mikeshultz/rawl/actions)
+[![Release](https://github.com/mikeshultz/rawl/workflows/release/badge.svg)](https://github.com/mikeshultz/rawl/actions)
+[![codecov](https://codecov.io/gh/mikeshultz/rawl/branch/master/graph/badge.svg?token=15WQT4DXKP)](https://codecov.io/gh/mikeshultz/rawl)
 
 An odd raw sql abstraction library.  It might suck.
 
