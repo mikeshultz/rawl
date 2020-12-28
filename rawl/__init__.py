@@ -379,11 +379,11 @@ class RawlBase(ABC):
                 result.append(rr)
 
         if not self._open_cursor:
-            log.debug('Closing cursor')
+            log.debug("Closing cursor")
             curs.close()
 
         if not self._open_transaction:
-            log.debug('put_conn({})'.format(id(conn)))
+            log.debug("put_conn({})".format(id(conn)))
             self._connection_manager.put_conn(conn)
 
         return result
@@ -433,7 +433,7 @@ class RawlBase(ABC):
         :returns:       Psycopg2 result
         """
 
-        commit = pop_or_none(kwargs, 'commit')
+        commit = pop_or_none(kwargs, "commit")
         working_columns = pop_or_none(kwargs, "columns")
 
         if commit is None and self._open_transaction is not None:
