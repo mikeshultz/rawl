@@ -76,6 +76,14 @@ POOL_MAX_CONN = 25
 log = logging.getLogger("rawl")
 
 
+def pop_or_none(d, k):
+    """ Pop a value from a dict or return None if not exists """
+    try:
+        return d.pop(k)
+    except KeyError:
+        return None
+
+
 class RawlException(Exception):
     pass
 
@@ -129,7 +137,7 @@ class RawlConnection(object):
         return True
 
     def get_conn(self):
-        log.info("Connecting to %s" % self.dsn)
+        log.debug("Retrieving connection from pool for %s" % self.dsn)
 
         conn = RawlConnection.pool.getconn()
         if conn.status not in OPEN_TRANSACTION_STATES:
@@ -299,7 +307,7 @@ class RawlBase(ABC):
 
         return query_string
 
-    def _execute(self, query, commit=False, working_columns=None):
+    def _execute(self, query, commit=True, working_columns=None, read_only=False):
         """
         Execute a query with provided parameters
 
@@ -371,9 +379,11 @@ class RawlBase(ABC):
                 result.append(rr)
 
         if not self._open_cursor:
+            log.debug('Closing cursor')
             curs.close()
 
         if not self._open_transaction:
+            log.debug('put_conn({})'.format(id(conn)))
             self._connection_manager.put_conn(conn)
 
         return result
@@ -404,12 +414,12 @@ class RawlBase(ABC):
         :commit:        Whether or not to commit the transaction after the query
         :returns:       Psycopg2 result
         """
-        commit = None
-        columns = None
-        if kwargs.get("commit") is not None:
-            commit = kwargs.pop("commit")
-        if kwargs.get("columns") is not None:
-            columns = kwargs.pop("columns")
+        commit = pop_or_none(kwargs, "commit")
+        columns = pop_or_none(kwargs, "columns")
+
+        if commit is None and self._open_transaction is not None:
+            commit = False
+
         query = self._assemble_simple(sql_string, *args, **kwargs)
         return self._execute(query, commit=commit, working_columns=columns)
 
@@ -422,13 +432,18 @@ class RawlBase(ABC):
         :*args:         Arguments to be passed for query parameters.
         :returns:       Psycopg2 result
         """
-        working_columns = None
-        if kwargs.get("columns") is not None:
-            working_columns = kwargs.pop("columns")
-        query = self._assemble_with_columns(sql_string, cols, *args, *kwargs)
-        return self._execute(query, working_columns=working_columns)
 
-    def insert_dict(self, value_dict, commit=False):
+        commit = pop_or_none(kwargs, 'commit')
+        working_columns = pop_or_none(kwargs, "columns")
+
+        if commit is None and self._open_transaction is not None:
+            commit = False
+
+        query = self._assemble_with_columns(sql_string, cols, *args, *kwargs)
+
+        return self._execute(query, working_columns=working_columns, commit=commit)
+
+    def insert_dict(self, value_dict, commit=True):
         """
         Execute an INSERT statement using a python dict
 

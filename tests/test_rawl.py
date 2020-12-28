@@ -273,6 +273,7 @@ class TestRawl(object):
 
         # Test that standard RETURNING is working
         assert new_row_id == 6
+        assert id(mod._open_transaction) != id(other_mod._open_transaction)
         assert len(new_result) == len(orig_result)
         assert len(uncommitted_new_result) == len(orig_result) + 1
 
