@@ -6,6 +6,18 @@ jobs:
   build:
     name: Coverage
     runs-on: ubuntu-latest
+    container: python:${{ matrix.python-version }}
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: rawl
+          POSTGRES_PASSWORD: s3cretpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -28,6 +40,9 @@ jobs:
 
       - name: Run Coverage
         run: coverage run --source rawl -m py.test
+        env:
+          PG_DSN: postgresql://rawl:s3cretpass@postgres:5432/postgres
+          RAWL_DSN: postgresql://rawl:s3cretpass@postgres:5432/rawl_test
 
       - name: Coveralls
         uses: coverallsapp/github-action@master
