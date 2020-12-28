@@ -6,7 +6,7 @@ jobs:
   build:
     name: Coverage
     runs-on: ubuntu-latest
-    container: python:${{ matrix.python-version }}
+    container: python:3.9
     services:
       postgres:
         image: postgres
