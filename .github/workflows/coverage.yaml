@@ -10,10 +10,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.9
         uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.9
 
       - name: Install dependencies
         run: |
@@ -25,6 +25,9 @@ jobs:
             pip install -e .
           fi
           pip install coveralls
+
+      - name: Run Coverage
+        run: coverage run --source rawl -m py.test
 
       - name: Coveralls
         uses: coverallsapp/github-action@master
