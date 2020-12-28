@@ -27,7 +27,7 @@ jobs:
         run: |
           apt update
           apt upgrade -y
-          apt install -y build-essential libpq-dev
+          apt install -y build-essential libpq-dev git curl
 
       - name: Set up Python 3.9
         uses: actions/setup-python@v2
@@ -55,7 +55,6 @@ jobs:
 
       - name: Run Coverage
         run: |
-          pip install pytest-cov
           pytest --cov=./ --cov-report=xml
         env:
           PG_DSN: postgresql://rawl:s3cretpass@postgres:5432/postgres
