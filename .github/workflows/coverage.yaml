@@ -6,7 +6,7 @@ jobs:
   build:
     name: Coverage
     runs-on: ubuntu-latest
-    container: python:3.9
+    container: python:3.9-alpine
     services:
       postgres:
         image: postgres
