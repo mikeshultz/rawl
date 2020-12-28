@@ -103,7 +103,9 @@ class RawlConnection(object):
 
         # Create the pool if it doesn't exist already
         if RawlConnection.pool is None:
-            RawlConnection.pool = ThreadedConnectionPool(POOL_MIN_CONN, POOL_MAX_CONN, self.dsn)
+            RawlConnection.pool = ThreadedConnectionPool(
+                POOL_MIN_CONN, POOL_MAX_CONN, self.dsn
+            )
             log.debug("Created connection pool ({})".format(id(RawlConnection.pool)))
         else:
             log.debug("Reusing connection pool ({})".format(id(RawlConnection.pool)))

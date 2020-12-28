@@ -475,6 +475,6 @@ class TestRawl(object):
 
         mod = TheModel(RAWL_DSN)
 
-        for i in range(0, POOL_MAX_CONN*2):
+        for i in range(0, POOL_MAX_CONN * 2):
             x = mod.insert_dict({"name": "Row seven is not eleven"}, commit=True)
             assert x > 0
