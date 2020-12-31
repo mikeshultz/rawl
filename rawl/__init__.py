@@ -340,12 +340,31 @@ class RawlBase(ABC):
         else:
             curs = conn.cursor()
 
-        try:
-            log.debug("Executing(%s): %s" % (query_id, query.as_string(curs)))
-        except Exception:
-            log.exception("LOGGING EXCEPTION LOL")
+        def _clean_up():
+            if not self._open_cursor:
+                log.debug("Closing cursor")
+                curs.close()
 
-        curs.execute(query)
+            if not self._open_transaction:
+                log.debug("put_conn({})".format(id(conn)))
+                self._connection_manager.put_conn(conn)
+
+        try:
+            query_string = query.as_string(curs)
+        except Exception:
+            query_string = ""
+
+        log.debug("Executing(%s): %s" % (query_id, query_string))
+
+        try:
+            curs.execute(query)
+        except Exception as err:
+            log.exception("Exception occurred when executing query: {}".format(query_string))
+
+            _clean_up()
+
+            # This still should be handled by the user of this lib
+            raise err
 
         log.debug("Executed")
 
@@ -378,13 +397,7 @@ class RawlBase(ABC):
                 rr = RawlResult(working_columns, row_dict)
                 result.append(rr)
 
-        if not self._open_cursor:
-            log.debug("Closing cursor")
-            curs.close()
-
-        if not self._open_transaction:
-            log.debug("put_conn({})".format(id(conn)))
-            self._connection_manager.put_conn(conn)
+        _clean_up()
 
         return result
 
