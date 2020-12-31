@@ -479,3 +479,24 @@ class TestRawl(object):
         for i in range(0, POOL_MAX_CONN * 2):
             x = mod.insert_dict({"name": "Row seven is not eleven"}, commit=True)
             assert x > 0
+
+    @pytest.mark.dependency(
+        depends=[
+            "TestRawl::test_insert_dict",
+            "TestRawl::test_insert_dict_without_commit",
+            "TestRawl::test_insert_dict_with_invalid_column",
+        ]
+    )
+    def test_many_insert_in_transaction(self, pgdb):
+        """
+        Test more inserts than POOL_MAX_CONN.  Tests against "connection pool
+        exhausted" errors
+        """
+
+        mod = TheModel(RAWL_DSN)
+
+        for i in range(0, POOL_MAX_CONN * 2):
+            mod.start_transaction()
+            x = mod.insert_dict({"name": "Row seven is not eleven"}, commit=False)
+            assert x > 0
+            mod.rollback()
