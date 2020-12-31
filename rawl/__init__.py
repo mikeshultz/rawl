@@ -359,7 +359,9 @@ class RawlBase(ABC):
         try:
             curs.execute(query)
         except Exception as err:
-            log.exception("Exception occurred when executing query: {}".format(query_string))
+            log.exception(
+                "Exception occurred when executing query: {}".format(query_string)
+            )
 
             _clean_up()
 
