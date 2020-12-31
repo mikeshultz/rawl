@@ -548,9 +548,14 @@ class RawlBase(ABC):
         """
         if self._open_transaction:
             log.debug("rollback()")
+
             if self._open_cursor:
                 self._open_cursor.close()
+
             self._open_transaction.rollback()
+            self._connection_manager.put_conn(self._open_transaction)
+
+            self._open_cursor = None
             self._open_transaction = None
         else:
             log.warning("Cannot rollback, no open transaction")
@@ -561,9 +566,14 @@ class RawlBase(ABC):
         """
         if self._open_transaction:
             log.debug("commit()")
+
             if self._open_cursor:
                 self._open_cursor.close()
+
             self._open_transaction.commit()
+            self._connection_manager.put_conn(self._open_transaction)
+
+            self._open_cursor = None
             self._open_transaction = None
         else:
             log.warning("Cannot commit, no open transaction")
