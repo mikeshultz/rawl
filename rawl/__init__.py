@@ -139,6 +139,9 @@ class RawlConnection(object):
     def get_conn(self):
         log.debug("Retrieving connection from pool for %s" % self.dsn)
 
+        # Silence mypy.  Should always be setup in constructor
+        assert RawlConnection.pool is not None
+
         conn = RawlConnection.pool.getconn()
         if conn.status not in OPEN_TRANSACTION_STATES:
             conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
