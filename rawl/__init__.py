@@ -56,19 +56,18 @@ License:
 import logging
 import random
 import warnings
-
-# EnumMeta is an alias to EnumType as of 3.11 - to be depreciated
-from enum import EnumMeta, IntEnum
 from abc import ABC
 from collections.abc import KeysView, ValuesView
-from json import JSONEncoder
 from datetime import datetime
+# EnumMeta is an alias to EnumType as of 3.11 - to be depreciated
+from enum import EnumMeta, IntEnum
+from json import JSONEncoder
+from types import TracebackType
+from typing import Any, Dict, Iterator, List, Optional, Type, TypeVar, Union
+
 from psycopg import Connection, Cursor, IsolationLevel, sql
 from psycopg.pq import TransactionStatus
 from psycopg_pool import ConnectionPool
-
-from types import TracebackType
-from typing import Any, Dict, Iterator, List, Optional, Type, TypeVar, Union
 
 OPEN_TRANSACTION_STATES = (TransactionStatus.ACTIVE, TransactionStatus.INTRANS)
 POOL_MIN_CONN = 1
