@@ -57,7 +57,7 @@ class TheCols(IntEnum):
 class TheModel(RawlBase):
     def __init__(self, dsn):
         # Generate column list from the Enum
-        columns = [str(col).split(".")[1] for col in TheCols]
+        columns = [col.name for col in TheCols]
 
         log.debug("columns: %s" % columns)
 
