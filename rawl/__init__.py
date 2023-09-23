@@ -56,28 +56,28 @@ License:
 import logging
 import random
 import warnings
-from enum import IntEnum
+from enum import Enum, EnumType, IntEnum
 from abc import ABC
+from collections.abc import KeysView, ValuesView
 from json import JSONEncoder
 from datetime import datetime
-from psycopg2 import sql
-from psycopg2.pool import ThreadedConnectionPool
-from psycopg2.extensions import (
-    STATUS_IN_TRANSACTION,
-    STATUS_BEGIN,
-    STATUS_PREPARED,
-    ISOLATION_LEVEL_READ_COMMITTED,
-)
+from psycopg import Connection, Cursor, IsolationLevel, sql
+from psycopg.pq import TransactionStatus
+from psycopg_pool import ConnectionPool
 
-OPEN_TRANSACTION_STATES = (STATUS_IN_TRANSACTION, STATUS_BEGIN, STATUS_PREPARED)
+from types import TracebackType
+from typing import Any, Dict, Iterator, List, Optional, Type, TypeVar, Union
+
+OPEN_TRANSACTION_STATES = (TransactionStatus.ACTIVE, TransactionStatus.INTRANS)
 POOL_MIN_CONN = 1
 POOL_MAX_CONN = 25
 
 log = logging.getLogger("rawl")
+_IE = TypeVar("_IE", bound=IntEnum)
 
 
-def pop_or_none(d, k):
-    """ Pop a value from a dict or return None if not exists """
+def pop_or_none(d: Dict[str, Any], k: str) -> Any:
+    """Pop a value from a dict or return None if not exists"""
     try:
         return d.pop(k)
     except KeyError:
@@ -88,7 +88,7 @@ class RawlException(Exception):
     pass
 
 
-class RawlConnection(object):
+class RawlConnection:
     """
     Connection handling for rawl
 
@@ -100,10 +100,9 @@ class RawlConnection(object):
         results = cursor.fetchall()
     """
 
-    pool = None
+    pool: Optional[ConnectionPool] = None
 
-    def __init__(self, dsn_string, close_on_exit=True):
-
+    def __init__(self, dsn_string: str, close_on_exit: bool = True) -> None:
         log.debug("Connection init")
 
         self.dsn = dsn_string
@@ -111,46 +110,53 @@ class RawlConnection(object):
 
         # Create the pool if it doesn't exist already
         if RawlConnection.pool is None:
-            RawlConnection.pool = ThreadedConnectionPool(
-                POOL_MIN_CONN, POOL_MAX_CONN, self.dsn
+            RawlConnection.pool = ConnectionPool(
+                self.dsn, min_size=POOL_MIN_CONN, max_size=POOL_MAX_CONN
             )
             log.debug("Created connection pool ({})".format(id(RawlConnection.pool)))
         else:
             log.debug("Reusing connection pool ({})".format(id(RawlConnection.pool)))
 
-    def __enter__(self):
+    def __enter__(self) -> Connection[Any]:
         conn = None
 
         try:
             conn = self.get_conn()
             return conn
 
-        except Exception:
+        except Exception as e:
             log.exception("Connection failure")
+            raise e
 
         finally:
-            self.put_conn(conn)
+            if conn is not None:
+                self.put_conn(conn)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> bool:
         if exc_val:
             self.entrance = False
         return True
 
-    def get_conn(self):
+    def get_conn(self) -> Connection[Any]:
         log.debug("Retrieving connection from pool for %s" % self.dsn)
 
         # Silence mypy.  Should always be setup in constructor
         assert RawlConnection.pool is not None
 
         conn = RawlConnection.pool.getconn()
-        if conn.status not in OPEN_TRANSACTION_STATES:
-            conn.set_session(isolation_level=ISOLATION_LEVEL_READ_COMMITTED)
+        if conn.info.transaction_status not in OPEN_TRANSACTION_STATES:
+            conn.isolation_level = IsolationLevel.READ_COMMITTED
         return conn
 
-    def put_conn(self, conn):
+    def put_conn(self, conn: Connection[Any]) -> None:
         if self.close_on_exit:
             # Assume rolled back if uncommitted
-            if conn.status in OPEN_TRANSACTION_STATES:
+            if conn.info.transaction_status in OPEN_TRANSACTION_STATES:
                 conn.rollback()
 
             # Silence mypy.  Should always be setup in constructor
@@ -159,36 +165,35 @@ class RawlConnection(object):
             RawlConnection.pool.putconn(conn)
 
 
-class RawlResult(object):
-    """ Represents a row of results retreived from the DB """
+class RawlResult:
+    """Represents a row of results retreived from the DB"""
 
-    def __init__(self, columns, data_dict):
+    def __init__(self, columns: List[str], data_dict: Dict[str, Any]) -> None:
         self._data = data_dict
         self.columns = columns
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self._data)
 
-    def __getattribute__(self, name):
+    def __getattribute__(self, name: str) -> Any:
         # Try for the local objects actual attributes first
         try:
             return object.__getattribute__(self, name)
 
         # Then resort to the data dict
         except AttributeError:
-
             if name in self._data:
                 return self._data[name]
             else:
                 raise AttributeError("%s is not available" % name)
 
-    def __getstate__(self):
+    def __getstate__(self) -> Dict[str, Any]:
         return self._data
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: Dict[str, Any]) -> None:
         self._data = state
 
-    def __getitem__(self, k):
+    def __getitem__(self, k: str) -> Any:
         # If it's an int, use the int to lookup a column in the position of the
         # sequence provided.
         if isinstance(k, int):
@@ -205,7 +210,7 @@ class RawlResult(object):
             except IndexError:
                 raise IndexError("Unknown index value %s" % k)
 
-    def __setitem__(self, k, v):
+    def __setitem__(self, k: str, v: Any) -> None:
         # If it's an int, use the int to lookup a column in the position of the
         # sequence provided.
         if isinstance(k, int):
@@ -222,37 +227,43 @@ class RawlResult(object):
             except IndexError:
                 raise IndexError("Unknown index value %s" % k)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._data)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         things = self._data.values()
         for x in things:
             yield x
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         return self._data.keys()
 
-    def values(self):
+    def values(self) -> ValuesView[Any]:
         return self._data.values()
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         return self._data
 
-    def to_list(self):
+    def to_list(self) -> List[Any]:
         return list(self.values())
 
 
 class RawlBase(ABC):
-    """ And abstract class for creating models out of raw SQL queries """
+    """And abstract class for creating models out of raw SQL queries"""
 
-    def __init__(self, dsn, columns, table_name, pk_name=None):
+    def __init__(
+        self,
+        dsn: str,
+        columns: List[str],
+        table_name: str,
+        pk_name: Optional[str] = None,
+    ) -> None:
         self.dsn = dsn
         self.table = table_name
-        self.columns = []
+        self.columns: List[str] = []
         self._connection_manager = RawlConnection(dsn)
-        self._open_transaction = None
-        self._open_cursor = None
+        self._open_transaction: Optional[Connection[Any]] = None
+        self._open_cursor: Optional[Cursor[Any]] = None
 
         # Process the provided columns into a list
         self.process_columns(columns)
@@ -264,7 +275,13 @@ class RawlBase(ABC):
         else:
             self.pk = columns[0]
 
-    def _assemble_with_columns(self, sql_str, columns, *args, **kwargs):
+    def _assemble_with_columns(
+        self,
+        sql_str: str,
+        columns: List[str],
+        *args: Optional[Any],
+        **kwargs: Optional[Any]
+    ) -> sql.Composed:
         """
         Format a select statement with specific columns
 
@@ -275,7 +292,7 @@ class RawlBase(ABC):
         """
 
         # Handle any aliased columns we get (e.g. table_alias.column)
-        qcols = []
+        qcols: List[Union[sql.Composed, sql.Identifier]] = []
         for col in columns:
             if "." in col:
                 # Explodeded it
@@ -292,7 +309,13 @@ class RawlBase(ABC):
 
         return query_string
 
-    def _assemble_select(self, sql_str, columns, *args, **kwargs):
+    def _assemble_select(
+        self,
+        sql_str: str,
+        columns: List[str],
+        *args: Optional[Any],
+        **kwargs: Optional[Any]
+    ) -> sql.Composed:
         """Alias for _assemble_with_columns"""
         warnings.warn(
             "_assemble_select has been depreciated for _assemble_with_columns. It will be removed in a future version.",
@@ -300,7 +323,9 @@ class RawlBase(ABC):
         )
         return self._assemble_with_columns(sql_str, columns, *args, **kwargs)
 
-    def _assemble_simple(self, sql_str, *args, **kwargs):
+    def _assemble_simple(
+        self, sql_str: str, *args: Optional[Any], **kwargs: Optional[Any]
+    ) -> sql.Composed:
         """
         Format a select statement with specific columns
 
@@ -313,7 +338,13 @@ class RawlBase(ABC):
 
         return query_string
 
-    def _execute(self, query, commit=True, working_columns=None, read_only=False):
+    def _execute(
+        self,
+        query: sql.Composed,
+        commit: bool = True,
+        working_columns: Optional[List[str]] = None,
+        read_only: bool = False,
+    ) -> List[RawlResult]:
         """
         Execute a query with provided parameters
 
@@ -346,7 +377,7 @@ class RawlBase(ABC):
         else:
             curs = conn.cursor()
 
-        def _clean_up():
+        def _clean_up() -> None:
             if not self._open_cursor:
                 log.debug("Closing cursor")
                 curs.close()
@@ -409,7 +440,7 @@ class RawlBase(ABC):
 
         return result
 
-    def process_columns(self, columns):
+    def process_columns(self, columns: Union[List[str], str, Type[_IE]]) -> None:
         """
         Handle provided columns and if necessary, convert columns to a list for
         internal strage.
@@ -421,12 +452,14 @@ class RawlBase(ABC):
             self.columns = columns
         elif isinstance(columns, str):
             self.columns = [c.strip() for c in columns.split()]
-        elif isinstance(columns, IntEnum):
+        elif type(columns) == EnumType:  # noqa: E721
             self.columns = [c.name for c in columns]
         else:
             raise RawlException("Unknown format for columns")
 
-    def query(self, sql_string, *args, **kwargs):
+    def query(
+        self, sql_string: str, *args: Optional[Any], **kwargs: Optional[Any]
+    ) -> List[RawlResult]:
         """
         Execute a DML query
 
@@ -435,16 +468,19 @@ class RawlBase(ABC):
         :commit:        Whether or not to commit the transaction after the query
         :returns:       Psycopg2 result
         """
-        commit = pop_or_none(kwargs, "commit")
+        commit = bool(kwargs.pop("commit", self._open_transaction is None))
         columns = pop_or_none(kwargs, "columns")
-
-        if commit is None and self._open_transaction is not None:
-            commit = False
 
         query = self._assemble_simple(sql_string, *args, **kwargs)
         return self._execute(query, commit=commit, working_columns=columns)
 
-    def select(self, sql_string, cols, *args, **kwargs):
+    def select(
+        self,
+        sql_string: str,
+        cols: List[str],
+        *args: Optional[Any],
+        **kwargs: Optional[Any]
+    ) -> List[RawlResult]:
         """
         Execute a SELECT statement
 
@@ -454,17 +490,15 @@ class RawlBase(ABC):
         :returns:       Psycopg2 result
         """
 
-        commit = pop_or_none(kwargs, "commit")
+        commit = bool(kwargs.pop("commit", self._open_transaction is None))
         working_columns = pop_or_none(kwargs, "columns")
 
-        if commit is None and self._open_transaction is not None:
-            commit = False
-
         query = self._assemble_with_columns(sql_string, cols, *args, *kwargs)
-
         return self._execute(query, working_columns=working_columns, commit=commit)
 
-    def insert_dict(self, value_dict, commit=True):
+    def insert_dict(
+        self, value_dict: Dict[str, Any], commit: bool = True
+    ) -> Optional[Union[RawlResult, Any]]:
         """
         Execute an INSERT statement using a python dict
 
@@ -525,7 +559,7 @@ class RawlBase(ABC):
         else:
             return None
 
-    def get(self, pk):
+    def get(self, pk: Union[str, int]) -> List[RawlResult]:
         """
         Retreive a single record from the table.  Lots of reasons this might be
         best implemented in the model
@@ -547,7 +581,7 @@ class RawlBase(ABC):
             pk,
         )
 
-    def all(self):
+    def all(self) -> List[RawlResult]:
         """
         Retreive all single record from the table.  Should be implemented but not
         required.
@@ -556,14 +590,14 @@ class RawlBase(ABC):
 
         return self.select("SELECT {0} FROM " + self.table + ";", self.columns)
 
-    def start_transaction(self):
+    def start_transaction(self) -> Connection[Any]:
         """
         Initiate a connection  to use as a transaction
         """
         self._open_transaction = self._connection_manager.get_conn()
         return self._open_transaction
 
-    def rollback(self):
+    def rollback(self) -> None:
         """
         Initiate a connection  to use as a transaction
         """
@@ -581,7 +615,7 @@ class RawlBase(ABC):
         else:
             log.warning("Cannot rollback, no open transaction")
 
-    def commit(self):
+    def commit(self) -> None:
         """
         Commit an already open transaction
         """
@@ -609,7 +643,7 @@ class RawlJSONEncoder(JSONEncoder):
     json.dumps(cls=RawlJSONEncoder)
     """
 
-    def default(self, o):
+    def default(self, o: Any) -> Any:
         if isinstance(o, datetime):
             return o.isoformat()
         elif isinstance(o, RawlResult):
