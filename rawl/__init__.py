@@ -59,8 +59,10 @@ import warnings
 from abc import ABC
 from collections.abc import KeysView, ValuesView
 from datetime import datetime
-# EnumMeta is an alias to EnumType as of 3.11 - to be depreciated
-from enum import EnumMeta, IntEnum
+from enum import (
+    EnumMeta,  # EnumMeta is an alias to EnumType as of 3.11 - to be depreciated
+    IntEnum,
+)
 from json import JSONEncoder
 from types import TracebackType
 from typing import Any, Dict, Iterator, List, Optional, Type, TypeVar, Union
