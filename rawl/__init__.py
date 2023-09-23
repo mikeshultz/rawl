@@ -56,7 +56,9 @@ License:
 import logging
 import random
 import warnings
-from enum import Enum, EnumType, IntEnum
+
+# EnumMeta is an alias to EnumType as of 3.11 - to be depreciated
+from enum import EnumMeta, IntEnum
 from abc import ABC
 from collections.abc import KeysView, ValuesView
 from json import JSONEncoder
@@ -273,7 +275,7 @@ class RawlBase(ABC):
             self.pk = pk_name
         # Otherwise, assume first column
         else:
-            if type(columns) == EnumType:  # noqa: E721
+            if type(columns) == EnumMeta:  # noqa: E721
                 self.pk = columns(0).name
             elif isinstance(columns, list) and len(columns) > 0:
                 self.pk = columns[0]
@@ -457,7 +459,7 @@ class RawlBase(ABC):
             self.columns = columns
         elif isinstance(columns, str):
             self.columns = [c.strip() for c in columns.split()]
-        elif type(columns) == EnumType:  # noqa: E721
+        elif type(columns) == EnumMeta:  # noqa: E721
             # trailing _ can be used to avoid conflict with Enum members
             self.columns = [c.name.rstrip("_") for c in columns]
         else:
