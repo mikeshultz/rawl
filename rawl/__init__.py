@@ -150,6 +150,9 @@ class RawlConnection(object):
             if conn.status in OPEN_TRANSACTION_STATES:
                 conn.rollback()
 
+            # Silence mypy.  Should always be setup in constructor
+            assert RawlConnection.pool is not None
+
             RawlConnection.pool.putconn(conn)
 
 
@@ -185,10 +188,10 @@ class RawlResult(object):
     def __getitem__(self, k):
         # If it's an int, use the int to lookup a column in the position of the
         # sequence provided.
-        if type(k) == int:
+        if isinstance(k, int):
             return dict.__getitem__(self._data, self.columns[k])
         # If it's a string, it's a dict lookup
-        elif type(k) == str:
+        elif isinstance(k, str):
             return dict.__getitem__(self._data, k)
         # Anything else and we have no idea how to handle it.
         else:
@@ -202,10 +205,10 @@ class RawlResult(object):
     def __setitem__(self, k, v):
         # If it's an int, use the int to lookup a column in the position of the
         # sequence provided.
-        if type(k) == int:
+        if isinstance(k, int):
             return dict.__setitem__(self._data, self.columns[k], v)
         # If it's a string, it's a dict lookup
-        elif type(k) == str:
+        elif isinstance(k, str):
             return dict.__setitem__(self._data, k, v)
         # Anything else and we have no idea how to handle it.
         else:
@@ -411,12 +414,12 @@ class RawlBase(ABC):
         :columns: A sequence of columns for the table. Can be list, comma
             -delimited string, or IntEnum.
         """
-        if type(columns) == list:
+        if isinstance(columns, list):
             self.columns = columns
-        elif type(columns) == str:
+        elif isinstance(columns, str):
             self.columns = [c.strip() for c in columns.split()]
-        elif type(columns) == IntEnum:
-            self.columns = [str(c) for c in columns]
+        elif isinstance(columns, IntEnum):
+            self.columns = [c.name for c in columns]
         else:
             raise RawlException("Unknown format for columns")
 
@@ -528,7 +531,7 @@ class RawlBase(ABC):
         :returns:       List of single result
         """
 
-        if type(pk) == str:
+        if isinstance(pk, str):
             # Probably an int, give it a shot
             try:
                 pk = int(pk)
@@ -604,8 +607,8 @@ class RawlJSONEncoder(JSONEncoder):
     """
 
     def default(self, o):
-        if type(o) == datetime:
+        if isinstance(o, datetime):
             return o.isoformat()
-        elif type(o) == RawlResult:
+        elif isinstance(o, RawlResult):
             return o.to_dict()
         return super(RawlJSONEncoder, self).default(o)
