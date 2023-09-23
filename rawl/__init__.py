@@ -193,7 +193,7 @@ class RawlResult:
     def __setstate__(self, state: Dict[str, Any]) -> None:
         self._data = state
 
-    def __getitem__(self, k: str) -> Any:
+    def __getitem__(self, k: Any) -> Any:
         # If it's an int, use the int to lookup a column in the position of the
         # sequence provided.
         if isinstance(k, int):
@@ -210,7 +210,7 @@ class RawlResult:
             except IndexError:
                 raise IndexError("Unknown index value %s" % k)
 
-    def __setitem__(self, k: str, v: Any) -> None:
+    def __setitem__(self, k: Any, v: Any) -> None:
         # If it's an int, use the int to lookup a column in the position of the
         # sequence provided.
         if isinstance(k, int):
@@ -254,7 +254,7 @@ class RawlBase(ABC):
     def __init__(
         self,
         dsn: str,
-        columns: List[str],
+        columns: Union[List[str], Type[_IE]],
         table_name: str,
         pk_name: Optional[str] = None,
     ) -> None:
@@ -273,14 +273,19 @@ class RawlBase(ABC):
             self.pk = pk_name
         # Otherwise, assume first column
         else:
-            self.pk = columns[0]
+            if type(columns) == EnumType:  # noqa: E721
+                self.pk = columns(0).name
+            elif isinstance(columns, list) and len(columns) > 0:
+                self.pk = columns[0]
+            else:
+                raise ValueError(f"Unexpected columns type: {type(columns)}")
 
     def _assemble_with_columns(
         self,
         sql_str: str,
         columns: List[str],
         *args: Optional[Any],
-        **kwargs: Optional[Any]
+        **kwargs: Optional[Any],
     ) -> sql.Composed:
         """
         Format a select statement with specific columns
@@ -314,7 +319,7 @@ class RawlBase(ABC):
         sql_str: str,
         columns: List[str],
         *args: Optional[Any],
-        **kwargs: Optional[Any]
+        **kwargs: Optional[Any],
     ) -> sql.Composed:
         """Alias for _assemble_with_columns"""
         warnings.warn(
@@ -453,7 +458,8 @@ class RawlBase(ABC):
         elif isinstance(columns, str):
             self.columns = [c.strip() for c in columns.split()]
         elif type(columns) == EnumType:  # noqa: E721
-            self.columns = [c.name for c in columns]
+            # trailing _ can be used to avoid conflict with Enum members
+            self.columns = [c.name.rstrip("_") for c in columns]
         else:
             raise RawlException("Unknown format for columns")
 
@@ -479,7 +485,7 @@ class RawlBase(ABC):
         sql_string: str,
         cols: List[str],
         *args: Optional[Any],
-        **kwargs: Optional[Any]
+        **kwargs: Optional[Any],
     ) -> List[RawlResult]:
         """
         Execute a SELECT statement
@@ -496,9 +502,7 @@ class RawlBase(ABC):
         query = self._assemble_with_columns(sql_string, cols, *args, *kwargs)
         return self._execute(query, working_columns=working_columns, commit=commit)
 
-    def insert_dict(
-        self, value_dict: Dict[str, Any], commit: bool = True
-    ) -> Optional[Union[RawlResult, Any]]:
+    def insert_dict(self, value_dict: Dict[str, Any], commit: bool = True) -> int:
         """
         Execute an INSERT statement using a python dict
 
@@ -543,7 +547,7 @@ class RawlBase(ABC):
             + """
             """,
             insert_cols,
-            *value_set
+            *value_set,
         )
 
         result = self._execute(query, commit=commit)
@@ -553,11 +557,12 @@ class RawlBase(ABC):
             # Return the pk if we can
             if hasattr(result[0], self.pk):
                 return getattr(result[0], self.pk)
-            # Otherwise, the full result
+            # Otherwise, the first col of result
             else:
-                return result[0]
+                # If it's an int
+                return result[0] if isinstance(result[0], int) else -1
         else:
-            return None
+            return 0
 
     def get(self, pk: Union[str, int]) -> List[RawlResult]:
         """
