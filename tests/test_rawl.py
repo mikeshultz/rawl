@@ -129,6 +129,17 @@ class TestRawl(object):
         assert mod.count() == 4
 
     @pytest.mark.dependency()
+    def test_exists(self, pgdb: Connection[Any]) -> None:
+        """Test out count() statement"""
+
+        mod = TheModel(RAWL_DSN)
+
+        assert mod.exists(1) is True
+        assert mod.exists(2) is True
+        assert mod.exists(3) is True
+        assert mod.exists(4) is True
+
+    @pytest.mark.dependency()
     def test_all(self, pgdb: Connection[Any]) -> None:
         """Test out a basic SELECT statement"""
 

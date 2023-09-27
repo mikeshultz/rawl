@@ -606,6 +606,20 @@ class RawlBase(ABC):
 
         return self.query("SELECT COUNT(*) FROM " + self.table + ";")[0][0]
 
+    def exists(self, pk: int) -> bool:
+        """
+        Check of a record with the given pk exists
+        :returns:       List of results
+        """
+
+        return (
+            self.query(
+                "SELECT COUNT(*) FROM " + self.table + " WHERE " + self.pk + " = {0};",
+                pk,
+            )[0][0]
+            > 0
+        )
+
     def start_transaction(self) -> Connection[Any]:
         """
         Initiate a connection  to use as a transaction
