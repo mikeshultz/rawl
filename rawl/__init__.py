@@ -598,6 +598,14 @@ class RawlBase(ABC):
 
         return self.select("SELECT {0} FROM " + self.table + ";", self.columns)
 
+    def count(self) -> int:
+        """
+        Get a count of all records in the table.
+        :returns:       List of results
+        """
+
+        return self.query("SELECT COUNT(*) FROM " + self.table + ";")[0][0]
+
     def start_transaction(self) -> Connection[Any]:
         """
         Initiate a connection  to use as a transaction
