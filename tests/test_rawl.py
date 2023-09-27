@@ -4,9 +4,11 @@ import logging
 import pickle
 import json
 from enum import IntEnum
-from psycopg2 import connect
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+from psycopg import Connection, connect
+
 from rawl import POOL_MAX_CONN, RawlBase, RawlResult, RawlJSONEncoder
+
+from typing import Any, List, Optional
 
 log = logging.getLogger(__name__)
 
@@ -28,9 +30,11 @@ RAWL_DSN = os.environ.get("RAWL_DSN", "postgresql://localhost:5432/rawl_test")
 
 
 @pytest.fixture(scope="module")
-def pgdb():
-    pgconn = connect(os.environ.get("PG_DSN", "postgresql://localhost:5432/postgres"))
-    pgconn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+def pgdb() -> Connection[Any]:
+    pgconn = connect(
+        os.environ.get("PG_DSN", "postgresql://localhost:5432/postgres"),
+        autocommit=True,
+    )
     cur = pgconn.cursor()
     cur.execute(DROP_TEST_DB)
     cur.execute(CREATE_TEST_DB)
@@ -50,21 +54,22 @@ def pgdb():
 class TheCols(IntEnum):
     rawl_id = 0
     stamp = 1
-    name = 2
+    # name conflicts with a member of Enum
+    name_ = 2
 
 
 # Test rawl query
 class TheModel(RawlBase):
-    def __init__(self, dsn):
+    def __init__(self, dsn: str) -> None:
         # Generate column list from the Enum
-        columns = [str(col).split(".")[1] for col in TheCols]
+        columns = [col.name.rstrip("_") for col in TheCols]
 
         log.debug("columns: %s" % columns)
 
         # Init the parent
         super(TheModel, self).__init__(dsn, columns=columns, table_name="rawl")
 
-    def select_rawls_with_extra_column(self, rawl_id):
+    def select_rawls_with_extra_column(self, rawl_id: int) -> Optional[RawlResult]:
         """Return the rawls from the rawl table but in a way to test more stuff"""
 
         # We're adding an arbitrary column in
@@ -72,7 +77,7 @@ class TheModel(RawlBase):
         cols.append("foo")
 
         res = self.select(
-            "SELECT {0}, TRUE" " FROM rawl" " WHERE rawl_id={1}",
+            "SELECT {0}, TRUE FROM rawl WHERE rawl_id={1}",
             self.columns,
             rawl_id,
             columns=cols,
@@ -83,7 +88,7 @@ class TheModel(RawlBase):
         else:
             return None
 
-    def query_rawls_with_asterisk(self, rawl_id):
+    def query_rawls_with_asterisk(self, rawl_id: int) -> Optional[RawlResult]:
         """Test out self.query directly using columns"""
 
         res = self.query(
@@ -95,13 +100,13 @@ class TheModel(RawlBase):
         else:
             return None
 
-    def delete_rawl(self, rawl_id):
-        """ Test a delete """
+    def delete_rawl(self, rawl_id: int) -> List[RawlResult]:
+        """Test a delete"""
 
         return self.query("DELETE FROM rawl WHERE rawl_id={0};", rawl_id, commit=True)
 
-    def delete_rawl_without_commit(self, rawl_id):
-        """ Test a delete """
+    def delete_rawl_without_commit(self, rawl_id: int) -> List[RawlResult]:
+        """Test a delete"""
 
         self.start_transaction()
 
@@ -116,8 +121,27 @@ class TheModel(RawlBase):
 
 class TestRawl(object):
     @pytest.mark.dependency()
-    def test_all(self, pgdb):
-        """ Test out a basic SELECT statement """
+    def test_count(self, pgdb: Connection[Any]) -> None:
+        """Test out count() statement"""
+
+        mod = TheModel(RAWL_DSN)
+
+        assert mod.count() == 4
+
+    @pytest.mark.dependency()
+    def test_exists(self, pgdb: Connection[Any]) -> None:
+        """Test out count() statement"""
+
+        mod = TheModel(RAWL_DSN)
+
+        assert mod.exists(1) is True
+        assert mod.exists(2) is True
+        assert mod.exists(3) is True
+        assert mod.exists(4) is True
+
+    @pytest.mark.dependency()
+    def test_all(self, pgdb: Connection[Any]) -> None:
+        """Test out a basic SELECT statement"""
 
         mod = TheModel(RAWL_DSN)
 
@@ -133,8 +157,8 @@ class TestRawl(object):
         assert "I am row one." in result[0]
 
     @pytest.mark.dependency()
-    def test_get_single_rawl(self, pgdb):
-        """ Test a SELECT WHERE """
+    def test_get_single_rawl(self, pgdb: Connection[Any]) -> None:
+        """Test a SELECT WHERE"""
 
         RAWL_ID = 2
 
@@ -144,7 +168,7 @@ class TestRawl(object):
 
         assert result is not None
         assert type(result) == RawlResult
-        assert result[TheCols.name] == "I am row two."
+        assert result[TheCols.name_] == "I am row two."
         assert result.rawl_id == RAWL_ID
         assert result["rawl_id"] == RAWL_ID
         assert result[0] == RAWL_ID
@@ -152,8 +176,8 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_delete_rawl(self, pgdb):
-        """ Test a DELETE """
+    def test_delete_rawl(self, pgdb: Connection[Any]) -> None:
+        """Test a DELETE"""
 
         RAWL_ID = 2
 
@@ -167,8 +191,8 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_rollback_without_commit(self, pgdb):
-        """ Test a DELETE without a commit """
+    def test_rollback_without_commit(self, pgdb: Connection[Any]) -> None:
+        """Test a DELETE without a commit"""
 
         RAWL_ID = 3
 
@@ -183,7 +207,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_access_invalid_attribute(self, pgdb):
+    def test_access_invalid_attribute(self, pgdb: Connection[Any]) -> None:
         """
         Test that an invalid attribute on the result object throws an
         exception.
@@ -205,7 +229,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_access_invalid_index(self, pgdb):
+    def test_access_invalid_index(self, pgdb: Connection[Any]) -> None:
         """
         Test that an invalid column index(in bytes string form) on the result
         object throws an exception.
@@ -230,7 +254,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_insert_dict(self, pgdb):
+    def test_insert_dict(self, pgdb: Connection[Any]) -> None:
         """
         Test that a new rawl entry can be created with insert_dict
         """
@@ -250,7 +274,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_insert_dict_without_commit(self, pgdb):
+    def test_insert_dict_without_commit(self, pgdb: Connection[Any]) -> None:
         """
         Test that multople insert_dicts can happen in one transaction
         """
@@ -309,7 +333,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_insert_dict_with_invalid_column(self, pgdb):
+    def test_insert_dict_with_invalid_column(self, pgdb: Connection[Any]) -> None:
         """
         Test case that an insert_dict with an invalid column fails
         """
@@ -325,7 +349,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_serialization(self, pgdb):
+    def test_serialization(self, pgdb: Connection[Any]) -> None:
         """
         Test that a RawlResult object can be serialized properly.
         """
@@ -355,7 +379,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_json_serialization(self, pgdb):
+    def test_json_serialization(self, pgdb: Connection[Any]) -> None:
         """
         Test that a RawlResult object can be serialized properly.
         """
@@ -376,7 +400,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_select_with_columns(self, pgdb):
+    def test_select_with_columns(self, pgdb: Connection[Any]) -> None:
         """
         Test a case with a select query with different columns that given
         for formatting.
@@ -396,7 +420,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_query_with_columns(self, pgdb):
+    def test_query_with_columns(self, pgdb: Connection[Any]) -> None:
         """
         Test a case with a query with an asterisk for columns so result columns
         must be specified
@@ -416,7 +440,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_get_with_string_pk(self, pgdb):
+    def test_get_with_string_pk(self, pgdb: Connection[Any]) -> None:
         """
         Test case that covers if a string is given as pk to get()
         """
@@ -432,7 +456,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_single_line_call(self, pgdb):
+    def test_single_line_call(self, pgdb: Connection[Any]) -> None:
         """
         Test single line calls where the model is instantiated and a method is
         called at the same time.
@@ -447,7 +471,7 @@ class TestRawl(object):
     @pytest.mark.dependency(
         depends=["TestRawl::test_all", "TestRawl::test_get_single_rawl"]
     )
-    def test_dict_assignment(self, pgdb):
+    def test_dict_assignment(self, pgdb: Connection[Any]) -> None:
         """
         This test tries to assign something to RawlResult as if it were a dict
         """
@@ -468,7 +492,7 @@ class TestRawl(object):
             "TestRawl::test_insert_dict_with_invalid_column",
         ]
     )
-    def test_many_insert(self, pgdb):
+    def test_many_insert(self, pgdb: Connection[Any]) -> None:
         """
         Test more inserts than POOL_MAX_CONN.  Tests against "connection pool
         exhausted" errors
@@ -487,7 +511,7 @@ class TestRawl(object):
             "TestRawl::test_insert_dict_with_invalid_column",
         ]
     )
-    def test_many_insert_in_transaction(self, pgdb):
+    def test_many_insert_in_transaction(self, pgdb: Connection[Any]) -> None:
         """
         Test more inserts than POOL_MAX_CONN.  Tests against "connection pool
         exhausted" errors

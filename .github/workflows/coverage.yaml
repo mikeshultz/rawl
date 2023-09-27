@@ -44,7 +44,7 @@ jobs:
           fi
 
       - name: Run Coverage
-        run: coverage run --source rawl -m py.test
+        run: coverage run --source rawl -m pytest
         env:
           PG_DSN: postgresql://rawl:s3cretpass@postgres:5432/postgres
           RAWL_DSN: postgresql://rawl:s3cretpass@postgres:5432/rawl_test

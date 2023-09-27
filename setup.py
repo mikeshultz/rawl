@@ -5,7 +5,7 @@ __DIR__ = os.path.abspath(os.path.dirname(__file__))
 
 setup(
     name="rawl",
-    version="0.3.5",
+    version="0.4.0",
     description="An ugly raw SQL postgresql db layer",
     url="https://github.com/mikeshultz/rawl",
     author="Mike Shultz",
@@ -15,13 +15,14 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Database",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
     keywords="postgresql database bindings sql",
     packages=find_packages(exclude=["build", "dist"]),
     package_data={"": ["README.md"]},
     install_requires=[
-        "psycopg2>=2.7.3.2",
+        "psycopg[pool]~=3.1.11",
     ],
 )
